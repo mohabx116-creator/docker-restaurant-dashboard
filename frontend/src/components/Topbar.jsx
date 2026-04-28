@@ -47,7 +47,7 @@ function Topbar({
           <span className="sr-only">Search</span>
           <input
             type="search"
-            placeholder="Search orders, customers..."
+            placeholder="Search analytics, orders, or customers..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
           />

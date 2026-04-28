@@ -16,6 +16,12 @@ const ORDER_STATUSES = [
   { value: "completed", label: "Completed" },
 ];
 
+const OVERVIEW_CHART_RANGES = [
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+];
+
 const STATUS_LABELS = ORDER_STATUSES.reduce((acc, status) => {
   acc[status.value] = status.label;
   return acc;
@@ -23,27 +29,37 @@ const STATUS_LABELS = ORDER_STATUSES.reduce((acc, status) => {
 
 const PAGE_META = {
   overview: {
-    title: "Overview",
+    title: "Dashboard Overview",
+    navTitle: "Overview",
+    eyebrow: "Overview",
     subtitle:
-      "Welcome back. Here is what is happening in your restaurant today.",
+      "Welcome back. Here's what's happening in your restaurant today.",
   },
   orders: {
     title: "Orders",
+    navTitle: "Orders",
+    eyebrow: "Orders",
     subtitle:
       "Manage live orders, update service status, and keep the kitchen workflow moving.",
   },
   analytics: {
     title: "Analytics",
+    navTitle: "Analytics",
+    eyebrow: "Analytics",
     subtitle:
       "Track revenue, service completion, and customer performance from protected account data.",
   },
   customers: {
     title: "Customers",
+    navTitle: "Customers",
+    eyebrow: "Customers",
     subtitle:
       "Review customer value, order frequency, and revenue contribution from live orders.",
   },
   settings: {
     title: "Settings",
+    navTitle: "Settings",
+    eyebrow: "Settings",
     subtitle:
       "Check account details, workspace information, and local environment configuration.",
   },
@@ -120,6 +136,7 @@ function App() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [overviewChartRange, setOverviewChartRange] = useState("weekly");
 
   const fetchOrders = async () => {
     if (!token) return null;
@@ -717,50 +734,45 @@ function App() {
       );
     }
 
-    return (
-      <div className="overview-note-card">
-        <span className="note-label">Live kitchen queue</span>
-        <strong>{liveAttentionCount} orders need attention</strong>
-        <small>
-          Pending and preparing orders update in real time from your protected
-          account data.
-        </small>
-      </div>
-    );
+    return null;
   };
 
-  const renderPageHero = () => (
-    <section className={`overview-hero page-hero page-${activePage}-hero`}>
-      <div className="page-hero-copy">
-        <span className="hero-eyebrow">{currentPage.title}</span>
-        <h1>{currentPage.title}</h1>
-        <p>{currentPage.subtitle}</p>
-      </div>
+  const renderPageHero = () => {
+    const heroAside = renderPageHeroAside();
 
-      <div className="overview-actions page-hero-aside">
-        <div className="hero-actions-bar">
-          <button
-            type="button"
-            className="secondary-button hero-action-button"
-            onClick={handleExportSnapshot}
-            disabled={!sortedFilteredOrders.length}
-          >
-            Export CSV
-          </button>
-
-          <button
-            type="button"
-            className="primary-button hero-action-button"
-            onClick={activePage === "settings" ? () => setActivePage("orders") : openCreateOrder}
-          >
-            {activePage === "settings" ? "Open Orders" : "New Order"}
-          </button>
+    return (
+      <section className={`overview-hero page-hero page-${activePage}-hero`}>
+        <div className="page-hero-copy">
+          <span className="hero-eyebrow">{currentPage.eyebrow || currentPage.title}</span>
+          <h1>{currentPage.title}</h1>
+          <p>{currentPage.subtitle}</p>
         </div>
 
-        {renderPageHeroAside()}
-      </div>
-    </section>
-  );
+        <div className="overview-actions page-hero-aside">
+          <div className="hero-actions-bar">
+            <button
+              type="button"
+              className="secondary-button hero-action-button"
+              onClick={handleExportSnapshot}
+              disabled={!sortedFilteredOrders.length}
+            >
+              Export Snapshot
+            </button>
+
+            <button
+              type="button"
+              className="primary-button hero-action-button"
+              onClick={activePage === "settings" ? () => setActivePage("orders") : openCreateOrder}
+            >
+              {activePage === "settings" ? "Open Orders" : "Add Order"}
+            </button>
+          </div>
+
+          {heroAside}
+        </div>
+      </section>
+    );
+  };
 
   const renderOverviewPage = () => (
     <>
@@ -952,6 +964,163 @@ function App() {
                 <span>{status.count}</span>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+    </>
+  );
+
+  const renderPremiumOverviewPage = () => (
+    <>
+      {renderPageHero()}
+
+      <section className="kpi-grid">
+        {primaryKpis.map((card) => (
+          <KpiCard key={card.label} {...card} />
+        ))}
+      </section>
+
+      <section className="dashboard-grid dashboard-grid-overview">
+        <div className="dashboard-column-left">
+          <div className="panel-card">
+            <div className="panel-header">
+              <div>
+                <h2>Revenue Performance</h2>
+                <p>
+                  Grouped customer revenue from the live protected order set in
+                  the current dashboard view.
+                </p>
+              </div>
+              <div className="panel-tabs">
+                {OVERVIEW_CHART_RANGES.map((range) => (
+                  <button
+                    key={range.value}
+                    type="button"
+                    className={`panel-tab ${
+                      overviewChartRange === range.value ? "active" : ""
+                    }`}
+                    onClick={() => setOverviewChartRange(range.value)}
+                  >
+                    {range.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <AnalyticsChart
+              data={groupedRevenueData}
+              isLoading={isOrdersLoading}
+              hasActiveFilters={hasActiveFilters}
+              formatCurrency={formatCurrency}
+              formatAxisCurrency={formatAxisCurrency}
+            />
+          </div>
+        </div>
+
+        <div className="dashboard-column-right">
+          <div className="widget-card popular-panel">
+            <div className="widget-header">
+              <span className="widget-icon">POP</span>
+              <span className="widget-chip">
+                {OVERVIEW_CHART_RANGES.find(
+                  (range) => range.value === overviewChartRange
+                )?.label || "Live"}
+              </span>
+            </div>
+            <h3>Popular Customers</h3>
+            <p>
+              Highest-value guests from the current filtered revenue snapshot.
+            </p>
+
+            <div className="popular-list">
+              {topCustomers.length === 0 ? (
+                <p className="mini-empty">No customer revenue data available.</p>
+              ) : (
+                topCustomers.slice(0, 3).map((customer) => (
+                  <div className="popular-list-row" key={customer.name}>
+                    <div className="popular-list-user">
+                      <span className="popular-list-avatar">
+                        {customer.name
+                          .split(" ")
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((part) => part[0]?.toUpperCase())
+                          .join("") || "RD"}
+                      </span>
+                      <div>
+                        <strong>{customer.name}</strong>
+                        <span>{customer.totalOrders} orders</span>
+                      </div>
+                    </div>
+                    <strong>{formatCurrency(customer.totalRevenue)}</strong>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="widget-link-button"
+              onClick={() => setActivePage("customers")}
+            >
+              View All Customers
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel-card recent-orders-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Recent Orders</h2>
+              <p>Latest protected orders from the current filtered service view.</p>
+            </div>
+            <div className="panel-inline-actions">
+              <button
+                type="button"
+                className="table-toolbar-button"
+                onClick={() => setActivePage("orders")}
+              >
+                View All
+              </button>
+              <button
+                type="button"
+                className="table-toolbar-button"
+                onClick={handleExportSnapshot}
+                disabled={!sortedFilteredOrders.length}
+              >
+                Export
+              </button>
+            </div>
+          </div>
+
+        <OrdersTable
+          orders={recentOrders}
+          totalOrders={orders.length}
+          hasActiveFilters={hasActiveFilters}
+          editingOrderId={editingOrderId}
+          deletingOrderId={deletingOrderId}
+          isBusy={isBusy}
+          isLoading={isOrdersLoading}
+          onEdit={handleEditOrder}
+          onDelete={handleDeleteOrder}
+          formatCurrency={formatCurrency}
+          formatDate={formatDate}
+          getOrderStatus={getOrderStatus}
+          statusLabels={STATUS_LABELS}
+        />
+
+        <div className="table-footer">
+          <span>
+            Showing {recentOrders.length} of {totalOrders} orders
+          </span>
+          <div className="table-pagination">
+            <button type="button" className="active">
+              1
+            </button>
+            <button type="button" onClick={() => setActivePage("orders")}>
+              All
+            </button>
           </div>
         </div>
       </section>
@@ -1326,7 +1495,7 @@ function App() {
       return renderSettingsPage();
     }
 
-    return renderOverviewPage();
+    return renderPremiumOverviewPage();
   };
 
   if (!token) {
@@ -1483,7 +1652,7 @@ function App() {
         <div className={`dashboard-content page-${activePage}`}>
           <Topbar
             currentUser={displayUser}
-            pageTitle={currentPage.title}
+            pageTitle={currentPage.navTitle || currentPage.title}
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             onExport={handleExportSnapshot}

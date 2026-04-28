@@ -21,6 +21,8 @@ function KpiCard({
         <strong className="kpi-value">{value}</strong>
         <p className="kpi-description">{description}</p>
       </div>
+
+      <span className="kpi-accent-line" aria-hidden="true"></span>
     </article>
   );
 }
