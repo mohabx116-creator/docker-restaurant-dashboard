@@ -26,6 +26,7 @@ services:
       DB_PASSWORD: admin123
       DB_NAME: restaurant
       JWT_SECRET: my_super_secret_key_123
+      CLIENT_URL: http://localhost:5173
 
   frontend:
     build: ./frontend

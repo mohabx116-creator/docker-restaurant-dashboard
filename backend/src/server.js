@@ -8,8 +8,28 @@ const jwt = require("jsonwebtoken");
 
 const app = express();
 const ORDER_STATUSES = new Set(["pending", "preparing", "completed"]);
+const DEFAULT_CLIENT_URL = "http://localhost:5173";
+const normalizeOrigin = (value) => String(value || "").trim().replace(/\/$/, "");
+const allowedOrigins = [
+    DEFAULT_CLIENT_URL,
+    process.env.CLIENT_URL,
+]
+    .flatMap((value) => String(value || "").split(","))
+    .map(normalizeOrigin)
+    .filter(Boolean);
 
-app.use(cors());
+app.use(
+    cors({
+        origin(origin, callback) {
+            if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
+                callback(null, true);
+                return;
+            }
+
+            callback(new Error("Not allowed by CORS"));
+        },
+    })
+);
 app.use(express.json());
 
 function normalizeOrderStatus(status = "pending") {
@@ -17,26 +37,42 @@ function normalizeOrderStatus(status = "pending") {
     return ORDER_STATUSES.has(normalizedStatus) ? normalizedStatus : null;
 }
 
-async function ensureOrdersStatusColumn() {
-    const tableCheck = await pool.query(
-        `SELECT EXISTS (
-            SELECT 1
-            FROM information_schema.tables
-            WHERE table_schema = 'public' AND table_name = 'orders'
-        ) AS exists`
-    );
+async function initDB() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
 
-    if (!tableCheck.rows[0]?.exists) {
-        return;
-    }
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS orders (
+            id SERIAL PRIMARY KEY,
+            customer_name TEXT NOT NULL,
+            total_price NUMERIC NOT NULL,
+            status TEXT DEFAULT 'pending',
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
 
     await pool.query(
-        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'pending'"
+        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'"
     );
-
+    await pool.query(
+        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE"
+    );
+    await pool.query(
+        "ALTER TABLE orders ALTER COLUMN status SET DEFAULT 'pending'"
+    );
     await pool.query(
         "UPDATE orders SET status = 'pending' WHERE status IS NULL OR status NOT IN ('pending', 'preparing', 'completed')"
     );
+
+    console.log("DB Ready");
 }
 
 function authenticateToken(req, res, next) {
@@ -185,14 +221,14 @@ app.delete("/orders/:id", authenticateToken, async (req, res) => {
 const PORT = process.env.PORT || 3001;
 
 async function startServer() {
-    await ensureOrdersStatusColumn();
+    await initDB();
 
     app.listen(PORT, () => {
-        console.log(`API running on http://localhost:${PORT}`);
+        console.log(`API running on port ${PORT}`);
     });
 }
 
 startServer().catch((error) => {
-    console.error("Failed to start API:", error);
+    console.error("DB initialization failed:", error);
     process.exit(1);
 });
