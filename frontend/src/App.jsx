@@ -1322,7 +1322,7 @@ function App() {
     <>
       {renderPageHero()}
 
-      <section className="kpi-grid">
+      <section className="kpi-grid products-kpi-grid">
         {primaryKpis.map((card) => (
           <KpiCard key={card.label} {...card} />
         ))}
@@ -2002,8 +2002,8 @@ function App() {
           onClick={() => setIsMobileSidebarOpen(false)}
         />
 
-        <main className="dashboard-main">
-          <div className={`dashboard-content page-${activePage}`}>
+        <main className="dashboard-main main-shell">
+          <div className={`dashboard-content page-content page-${activePage}`}>
             <Topbar
               currentUser={displayUser}
               pageTitle={currentPage.navTitle}

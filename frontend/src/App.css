@@ -37,6 +37,8 @@ html,
 body,
 #root {
   min-height: 100%;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -378,8 +380,11 @@ select:disabled {
 .dashboard-shell {
   min-height: 100vh;
   width: 100%;
+  display: flex;
+  align-items: stretch;
+  overflow-x: hidden;
   position: relative;
-  background: transparent;
+  background: var(--bg);
 }
 
 .sidebar-backdrop {
@@ -387,11 +392,11 @@ select:disabled {
 }
 
 .sidebar-shell {
+  flex: 0 0 var(--sidebar-width);
   width: var(--sidebar-width);
-  position: fixed;
-  left: 0;
+  min-width: var(--sidebar-width);
+  position: sticky;
   top: 0;
-  bottom: 0;
   z-index: 30;
   height: 100vh;
   display: grid;
@@ -576,18 +581,25 @@ select:disabled {
 }
 
 .dashboard-main {
+  flex: 1 1 auto;
   min-height: 100vh;
   min-width: 0;
-  width: calc(100vw - var(--sidebar-width));
+  width: 100%;
   max-width: none;
-  margin-left: var(--sidebar-width);
+  overflow-x: hidden;
   padding: 24px 32px 36px;
 }
 
-.dashboard-content {
+.dashboard-content,
+.page-content {
   width: 100%;
   min-width: 0;
   max-width: none;
+  overflow-x: hidden;
+}
+
+.dashboard-content > * {
+  min-width: 0;
 }
 
 .topbar-shell {
@@ -596,7 +608,9 @@ select:disabled {
   top: 0;
   z-index: 12;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 20px;
   padding: 0 4px 20px;
   margin-bottom: 8px;
@@ -612,10 +626,11 @@ select:disabled {
 }
 
 .topbar-leading {
-  flex: 1;
+  flex: 1 1 440px;
   min-width: 0;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 16px;
 }
 
@@ -627,8 +642,9 @@ select:disabled {
 }
 
 .topbar-search {
-  flex: 1;
-  max-width: 560px;
+  flex: 1 1 360px;
+  width: 100%;
+  max-width: none;
   min-height: 52px;
   display: flex;
   align-items: center;
@@ -646,6 +662,8 @@ select:disabled {
 }
 
 .topbar-search input {
+  width: 100%;
+  min-width: 0;
   min-height: auto;
   padding: 0;
   border: 0;
@@ -669,6 +687,8 @@ select:disabled {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
@@ -707,8 +727,10 @@ select:disabled {
 
 .topbar-user {
   display: flex;
+  flex: 0 1 240px;
   align-items: center;
   gap: 12px;
+  min-width: 0;
   min-height: 46px;
   max-width: 240px;
   padding: 6px 10px 6px 6px;
@@ -756,7 +778,7 @@ select:disabled {
 
 .overview-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 420px);
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 420px);
   gap: 24px;
   align-items: end;
   margin-bottom: 24px;
@@ -847,6 +869,16 @@ select:disabled {
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 24px;
   margin-bottom: 24px;
+  width: 100%;
+  min-width: 0;
+}
+
+.products-kpi-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.products-kpi-grid > * {
+  grid-column: auto;
 }
 
 .kpi-grid > *,
@@ -1009,7 +1041,8 @@ select:disabled {
 }
 
 .filters-controls .filter-field {
-  min-width: 220px;
+  flex: 1 1 220px;
+  min-width: 0;
 }
 
 .active-filters {
@@ -1025,6 +1058,8 @@ select:disabled {
   gap: 24px;
   margin-bottom: 24px;
   align-items: start;
+  width: 100%;
+  min-width: 0;
 }
 
 .dashboard-grid-overview {
@@ -1036,6 +1071,8 @@ select:disabled {
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 24px;
   align-items: start;
+  width: 100%;
+  min-width: 0;
 }
 
 .dashboard-column-left,
@@ -1317,6 +1354,8 @@ select:disabled {
 .settings-grid {
   display: grid;
   gap: 24px;
+  width: 100%;
+  min-width: 0;
 }
 
 .summary-grid {
@@ -1377,12 +1416,15 @@ select:disabled {
 }
 
 .detail-row span {
-  max-width: 42%;
+  min-width: 0;
+  max-width: none;
 }
 
 .detail-row strong {
-  max-width: 54%;
+  min-width: 0;
+  max-width: none;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .settings-logout {
@@ -1441,7 +1483,7 @@ select:disabled {
 
 .products-toolbar {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   align-items: end;
 }
@@ -1451,6 +1493,8 @@ select:disabled {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 24px;
   margin-bottom: 24px;
+  width: 100%;
+  min-width: 0;
 }
 
 .product-card {
