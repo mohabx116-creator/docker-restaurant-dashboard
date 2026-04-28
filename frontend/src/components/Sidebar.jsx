@@ -20,6 +20,8 @@ function Sidebar({
   onPageChange,
   isMobileOpen,
   onClose,
+  onCreateOrder,
+  onLogout,
 }) {
   return (
     <aside className={`sidebar-shell ${isMobileOpen ? "mobile-open" : ""}`}>
@@ -27,8 +29,8 @@ function Sidebar({
         <div className="sidebar-brand">
           <div className="brand-mark">RD</div>
           <div className="sidebar-brand-copy">
-            <strong>Restaurant Dashboard</strong>
-            <span>Editorial Admin</span>
+            <strong>RestoDash Lite</strong>
+            <span>Premium Operations</span>
           </div>
         </div>
 
@@ -42,7 +44,9 @@ function Sidebar({
         </button>
       </div>
 
-      <p className="sidebar-copy">Dashboard Lite</p>
+      <p className="sidebar-copy">
+        Executive view for live orders, revenue performance, and customer service.
+      </p>
 
       <nav className="sidebar-nav">
         {NAV_ITEMS.map((item) => (
@@ -62,12 +66,29 @@ function Sidebar({
         ))}
       </nav>
 
-      <div className="sidebar-user-card">
-        <div className="sidebar-user-avatar">{getInitials(currentUser?.name)}</div>
-        <div className="sidebar-user-meta">
-          <strong>{currentUser?.name || "Restaurant Manager"}</strong>
-          <span>{currentUser?.email || "manager@dashboard.local"}</span>
+      <div className="sidebar-footer">
+        <button
+          type="button"
+          className="primary-button sidebar-cta-button"
+          onClick={() => {
+            onCreateOrder?.();
+            onClose?.();
+          }}
+        >
+          New Order
+        </button>
+
+        <div className="sidebar-user-card">
+          <div className="sidebar-user-avatar">{getInitials(currentUser?.name)}</div>
+          <div className="sidebar-user-meta">
+            <strong>{currentUser?.name || "Restaurant Manager"}</strong>
+            <span>{currentUser?.email || "manager@dashboard.local"}</span>
+          </div>
         </div>
+
+        <button type="button" className="sidebar-logout-button" onClick={onLogout}>
+          Logout
+        </button>
       </div>
     </aside>
   );

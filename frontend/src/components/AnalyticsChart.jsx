@@ -38,7 +38,7 @@ function AnalyticsChart({
         >
           <CartesianGrid
             vertical={false}
-            stroke="#F0DDD0"
+            stroke="#E4E1EA"
             strokeDasharray="4 4"
           />
           <XAxis
@@ -58,9 +58,9 @@ function AnalyticsChart({
           />
           <Tooltip
             formatter={(value) => formatCurrency(value)}
-            cursor={{ fill: "#FFEDD5" }}
+            cursor={{ fill: "#E0E0FF" }}
           />
-          <Bar dataKey="total" fill="#C2410C" radius={[10, 10, 0, 0]} />
+          <Bar dataKey="total" fill="#1A237E" radius={[10, 10, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

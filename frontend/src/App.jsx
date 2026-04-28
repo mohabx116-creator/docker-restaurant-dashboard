@@ -6,6 +6,7 @@ import KpiCard from "./components/KpiCard";
 import AnalyticsChart from "./components/AnalyticsChart";
 import OrdersTable from "./components/OrdersTable";
 import OrderForm from "./components/OrderForm";
+import BottomNav from "./components/BottomNav";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -193,6 +194,11 @@ function App() {
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
+  };
+
+  const openCreateOrder = () => {
+    resetForm();
+    setActivePage("orders");
   };
 
   const handleAuth = async (e) => {
@@ -731,7 +737,28 @@ function App() {
         <p>{currentPage.subtitle}</p>
       </div>
 
-      <div className="overview-actions page-hero-aside">{renderPageHeroAside()}</div>
+      <div className="overview-actions page-hero-aside">
+        <div className="hero-actions-bar">
+          <button
+            type="button"
+            className="secondary-button hero-action-button"
+            onClick={handleExportSnapshot}
+            disabled={!sortedFilteredOrders.length}
+          >
+            Export CSV
+          </button>
+
+          <button
+            type="button"
+            className="primary-button hero-action-button"
+            onClick={activePage === "settings" ? () => setActivePage("orders") : openCreateOrder}
+          >
+            {activePage === "settings" ? "Open Orders" : "New Order"}
+          </button>
+        </div>
+
+        {renderPageHeroAside()}
+      </div>
     </section>
   );
 
@@ -1305,71 +1332,127 @@ function App() {
   if (!token) {
     return (
       <main className="auth-page">
-        <section className="auth-card">
-          <div className="auth-brand">
-            <div className="brand-mark">RD</div>
-            <div>
-              <strong>Restaurant Dashboard</strong>
-              <span>Dashboard Lite</span>
+        <section className="auth-shell">
+          <div className="auth-brand-panel">
+            <div className="auth-brand">
+              <div className="brand-mark">RD</div>
+              <div>
+                <strong>RestoDash Lite</strong>
+                <span>Executive Restaurant SaaS</span>
+              </div>
+            </div>
+
+            <div className="auth-brand-copy">
+              <h2>Manage your restaurant operations with confidence</h2>
+              <p>
+                Track live orders, monitor revenue, and keep the service floor aligned
+                from one protected workspace.
+              </p>
+            </div>
+
+            <div className="auth-brand-metric">
+              <div className="auth-brand-avatars">
+                <span>CH</span>
+                <span>OP</span>
+                <span>+2K</span>
+              </div>
+              <strong>Trusted by ambitious dining teams.</strong>
+              <p>Daily order flow, customer history, and analytics in one calm dashboard.</p>
             </div>
           </div>
 
-          <h1>{isRegister ? "Create Account" : "Welcome Back"}</h1>
-          <p>
-            {isRegister
-              ? "Create your account to start managing service, revenue, and guest flow."
-              : "Login to access your restaurant operations workspace."}
-          </p>
+          <section className="auth-card">
+            <div className="auth-mobile-brand">
+              <div className="brand-mark">RD</div>
+              <div>
+                <strong>RestoDash Lite</strong>
+                <span>Dashboard Lite</span>
+              </div>
+            </div>
 
-          <form onSubmit={handleAuth} className="auth-form">
-            {isRegister && (
-              <input
-                type="text"
-                value={name}
-                placeholder="Full name"
-                onChange={(e) => setName(e.target.value)}
+            <div className="auth-header">
+              <h1>{isRegister ? "Create your account" : "Welcome Back"}</h1>
+              <p>
+                {isRegister
+                  ? "Create your account to start managing service, revenue, and guest flow."
+                  : "Login to access your executive restaurant workspace."}
+              </p>
+            </div>
+
+            <form onSubmit={handleAuth} className="auth-form">
+              {isRegister && (
+                <label className="auth-field">
+                  <span>Full Name</span>
+                  <input
+                    type="text"
+                    value={name}
+                    placeholder="Your full name"
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={isAuthLoading}
+                    required
+                  />
+                </label>
+              )}
+
+              <label className="auth-field">
+                <span>Email</span>
+                <input
+                  type="email"
+                  value={email}
+                  placeholder="chef@restodash.com"
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isAuthLoading}
+                  required
+                />
+              </label>
+
+              <label className="auth-field">
+                <span>Password</span>
+                <input
+                  type="password"
+                  value={password}
+                  placeholder="Enter your password"
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isAuthLoading}
+                  required
+                />
+              </label>
+
+              <label className="auth-remember">
+                <input type="checkbox" disabled={isAuthLoading} />
+                <span>Keep me signed in on this device</span>
+              </label>
+
+              <button
+                type="submit"
                 disabled={isAuthLoading}
-                required
-              />
-            )}
+                className="primary-button auth-submit"
+              >
+                {isAuthLoading
+                  ? isRegister
+                    ? "Creating Account..."
+                    : "Logging in..."
+                  : isRegister
+                    ? "Create Account"
+                    : "Login"}
+              </button>
+            </form>
 
-            <input
-              type="email"
-              value={email}
-              placeholder="Email address"
-              onChange={(e) => setEmail(e.target.value)}
+            <button
+              type="button"
+              className="auth-switch"
+              onClick={() => !isAuthLoading && setIsRegister(!isRegister)}
               disabled={isAuthLoading}
-              required
-            />
-
-            <input
-              type="password"
-              value={password}
-              placeholder="Password"
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isAuthLoading}
-              required
-            />
-
-            <button type="submit" disabled={isAuthLoading}>
-              {isAuthLoading
-                ? isRegister
-                  ? "Creating Account..."
-                  : "Logging in..."
-                : isRegister
-                  ? "Create Account"
-                  : "Login"}
+            >
+              {isRegister
+                ? "Already have an account? Login"
+                : "Do not have an account yet? Register"}
             </button>
-          </form>
 
-          <p
-            className="auth-switch"
-            onClick={() => !isAuthLoading && setIsRegister(!isRegister)}
-          >
-            {isRegister
-              ? "Already have an account? Login"
-              : "Don't have an account? Register"}
-          </p>
+            <p className="auth-security-note">
+              Enterprise-grade session security, JWT authentication, and protected order access.
+            </p>
+          </section>
         </section>
       </main>
     );
@@ -1385,6 +1468,8 @@ function App() {
         onPageChange={setActivePage}
         isMobileOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
+        onCreateOrder={openCreateOrder}
+        onLogout={handleLogout}
       />
 
       <button
@@ -1417,6 +1502,12 @@ function App() {
           {renderActivePage()}
         </div>
       </main>
+
+      <BottomNav
+        activePage={activePage}
+        onPageChange={setActivePage}
+        onCreateOrder={openCreateOrder}
+      />
     </div>
   );
 }

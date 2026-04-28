@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RestoDash Lite - Authentication</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed": "#e0e0ff",
+                        "on-surface-variant": "#454652",
+                        "secondary": "#006e1c",
+                        "on-secondary-fixed-variant": "#005313",
+                        "primary-container": "#1a237e",
+                        "on-primary-container": "#8690ee",
+                        "secondary-container": "#91f78e",
+                        "error": "#ba1a1a",
+                        "outline-variant": "#c6c5d4",
+                        "on-primary-fixed-variant": "#343d96",
+                        "surface-variant": "#e4e1ea",
+                        "on-tertiary-container": "#e17c5a",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed": "#ffdbd0",
+                        "error-container": "#ffdad6",
+                        "inverse-surface": "#303036",
+                        "on-tertiary-fixed": "#390c00",
+                        "surface-bright": "#fbf8ff",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#5c1800",
+                        "surface-tint": "#4c56af",
+                        "tertiary-fixed-dim": "#ffb59d",
+                        "surface-container-low": "#f5f2fb",
+                        "inverse-primary": "#bdc2ff",
+                        "on-background": "#1b1b21",
+                        "background": "#fbf8ff",
+                        "surface-dim": "#dbd9e1",
+                        "secondary-fixed-dim": "#78dc77",
+                        "on-secondary": "#ffffff",
+                        "surface": "#fbf8ff",
+                        "primary": "#000666",
+                        "on-tertiary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#002204",
+                        "surface-container": "#efecf5",
+                        "on-surface": "#1b1b21",
+                        "on-primary-fixed": "#000767",
+                        "outline": "#767683",
+                        "on-error": "#ffffff",
+                        "inverse-on-surface": "#f2eff8",
+                        "secondary-fixed": "#94f990",
+                        "on-secondary-container": "#00731e",
+                        "surface-container-high": "#eae7ef",
+                        "primary-fixed-dim": "#bdc2ff",
+                        "on-tertiary-fixed-variant": "#7b2e12",
+                        "surface-container-highest": "#e4e1ea",
+                        "tertiary": "#380b00"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container_margin": "32px",
+                        "sidebar_width": "260px",
+                        "gutter": "24px",
+                        "card_padding": "20px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Inter"],
+                        "h2": ["Inter"],
+                        "h1": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "kpi-value": ["Inter"],
+                        "h3": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["16px", {"lineHeight": "1.6", "letterSpacing": "0", "fontWeight": "400"}],
+                        "h2": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "h1": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                        "kpi-value": ["28px", {"lineHeight": "1", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "h3": ["20px", {"lineHeight": "1.4", "letterSpacing": "0", "fontWeight": "600"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "letterSpacing": "0", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col justify-center items-center relative overflow-hidden">
+<!-- Ambient Background Elements -->
+<div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary-fixed/30 blur-[120px] pointer-events-none"></div>
+<div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-secondary-container/20 blur-[120px] pointer-events-none"></div>
+<!-- Main Auth Container -->
+<main class="w-full max-w-[1200px] grid grid-cols-1 lg:grid-cols-2 gap-0 shadow-2xl rounded-xl overflow-hidden glass-panel z-10 mx-container_margin">
+<!-- Left Side: Visual/Branding Section -->
+<section class="hidden lg:flex flex-col justify-between p-12 bg-primary text-on-primary relative">
+<div class="z-20">
+<div class="flex items-center gap-3 mb-12">
+<div class="w-10 h-10 bg-on-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="restaurant_menu">restaurant_menu</span>
+</div>
+<span class="font-h2 text-h2 tracking-tight">RestoDash Lite</span>
+</div>
+<h1 class="font-h1 text-h1 max-w-md leading-tight mb-6">Master your kitchen's rhythm with surgical precision.</h1>
+<p class="font-body-lg text-body-lg text-primary-fixed/80 max-w-sm">Elevate your operational excellence with real-time analytics and seamless order management.</p>
+</div>
+<div class="z-20">
+<div class="flex items-center gap-4 p-card_padding bg-white/10 rounded-lg border border-white/5 backdrop-blur-sm">
+<div class="flex -space-x-2">
+<img class="w-10 h-10 rounded-full border-2 border-primary object-cover" data-alt="close-up portrait of a professional executive chef in a white uniform smiling" src="https://lh3.googleusercontent.com/aida-public/AB6AXuANkOJOykF_9q_75bZHzSR5hcd04DJo7rtrAGf_OUnDyFniIDnMzIqgwDKhoS1TYrJ37AOzks4nqYeQF4sLOZqIx21Z0ikq35OPScQ-qd7fX52lC5fWcppErSWo6dJg1CNVzf20UQbpQMwlSl86JWH5VB-rRiLjO5bPCGiBr_XsNMW7mUusNCoqaTSEbWW-Yyhgw02woL5gBxqxvft4Kwu2-y9BndGOXn8HCbSqLClXvunjADNC7wTvr-3Wf5bIKWJZiDM-kk9Dgbw"/>
+<img class="w-10 h-10 rounded-full border-2 border-primary object-cover" data-alt="professional woman restaurant manager in a smart casual blazer" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmCeFBcVOt-v7tZyp8TFsa2mF3F520nisBmMF-op_zEb9Etj9kuG8vwiJPcEDBvd1uyzAzQn5Vf2HlKhshaszMTwIuJawvalbSaEvN193gn848122ZVv4KMDYwGYhcWA2nS7rP7-SqAEewGUuTBnyMnWkVjIpczt6B3t3Hr78KQuwDGh18ryxyxZYGsbl7tow-qAKu27yIfWYdEBFa2QFlGBu8K1shoG11Nqeoz001b1Njdh9DD_q0ow8tDDYPC-e01pVPTG7roec"/>
+<div class="w-10 h-10 rounded-full border-2 border-primary bg-on-primary-container flex items-center justify-center text-[10px] font-bold">+2k</div>
+</div>
+<p class="font-label-sm text-label-sm">Join 2,000+ elite restaurateurs managing over 500k orders monthly.</p>
+</div>
+</div>
+<!-- Background Texture for Brand Side -->
+<div class="absolute inset-0 opacity-20 pointer-events-none">
+<img class="w-full h-full object-cover grayscale mix-blend-overlay" data-alt="blurred busy high-end restaurant kitchen with warm lighting and stainless steel surfaces" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCDEMeOAqEtTlHpNp0bLf2zFlgYBYqrUyMLvdJYtHg_dsTtyM7Y2UNbb0RtFPn0EF46W7AXeCBT9GCsInDgWMdpGydz0L12QYJ21cNb5PHsZBpvj2JTt7GcySlTfKkUhOAkMI_TxuU1CD6OFQMEi3FOr4ybrUACKZCUaBZX8VTHW9fnbmGN4hELI5sOCLR3o4aI7FXJnIfwJ2iIQQBo8qm9hD32wrAMEK4vLBakZpzoiM71lArlJYkprOlVsv6hvD5L1wxAVDIMBto"/>
+</div>
+</section>
+<!-- Right Side: Interaction Section -->
+<section class="flex flex-col justify-center p-8 md:p-16 lg:p-20 bg-surface-container-lowest">
+<!-- Mobile Branding (Hidden on Desktop) -->
+<div class="lg:hidden flex items-center gap-2 mb-12">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="restaurant_menu">restaurant_menu</span>
+<span class="font-h3 text-h3 text-primary">RestoDash Lite</span>
+</div>
+<div class="mb-10">
+<h2 class="font-h2 text-h2 text-on-surface mb-2">Welcome Back</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Enter your credentials to access your executive dashboard.</p>
+</div>
+<form class="space-y-6">
+<!-- Email Field -->
+<div class="space-y-2">
+<label class="font-label-sm text-label-sm text-on-surface-variant block px-1" for="email">Email/Username</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline text-lg group-focus-within:text-primary transition-colors" data-icon="alternate_email">alternate_email</span>
+</div>
+<input class="w-full pl-11 pr-4 py-3 bg-surface-container border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body-md" id="email" placeholder="chef@restodash.com" type="email"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="space-y-2">
+<div class="flex justify-between items-center px-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant" for="password">Password</label>
+<a class="font-label-sm text-label-sm text-primary hover:underline" href="#">Forgot Password?</a>
+</div>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline text-lg group-focus-within:text-primary transition-colors" data-icon="lock_open">lock_open</span>
+</div>
+<input class="w-full pl-11 pr-12 py-3 bg-surface-container border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-body-md" id="password" placeholder="••••••••" type="password"/>
+<button class="absolute inset-y-0 right-0 pr-4 flex items-center text-outline hover:text-primary transition-colors" type="button">
+<span class="material-symbols-outlined text-lg" data-icon="visibility">visibility</span>
+</button>
+</div>
+</div>
+<!-- Remember Me -->
+<div class="flex items-center gap-3 px-1">
+<input class="w-4 h-4 text-primary border-outline-variant rounded focus:ring-primary/20 bg-surface-container" id="remember" type="checkbox"/>
+<label class="font-body-md text-body-md text-on-surface-variant" for="remember">Keep me signed in on this device</label>
+</div>
+<!-- Primary Action -->
+<button class="w-full py-4 bg-primary text-on-primary rounded-lg font-h3 text-h3 shadow-lg hover:shadow-primary/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2" type="submit">
+                    Login
+                    <span class="material-symbols-outlined text-lg" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</form>
+<!-- Social/Other Logins -->
+<div class="mt-10 relative">
+<div class="absolute inset-0 flex items-center">
+<div class="w-full border-t border-outline-variant"></div>
+</div>
+<div class="relative flex justify-center text-label-sm">
+<span class="px-4 bg-surface-container-lowest text-outline uppercase tracking-widest font-bold">Or continue with</span>
+</div>
+</div>
+<div class="mt-8 grid grid-cols-2 gap-4">
+<button class="flex items-center justify-center gap-3 py-3 px-4 border border-outline-variant rounded-lg hover:bg-surface-container-low transition-colors font-body-md text-on-surface">
+<span class="material-symbols-outlined" data-icon="passkey">passkey</span>
+                    SSO
+                </button>
+<button class="flex items-center justify-center gap-3 py-3 px-4 border border-outline-variant rounded-lg hover:bg-surface-container-low transition-colors font-body-md text-on-surface">
+<span class="material-symbols-outlined" data-icon="key">key</span>
+                    Auth0
+                </button>
+</div>
+<!-- Footer Action -->
+<p class="mt-12 text-center font-body-md text-body-md text-on-surface-variant">
+                New to the platform? 
+                <a class="text-primary font-bold hover:underline ml-1" href="#">Create Account</a>
+</p>
+<!-- Security Badge -->
+<div class="mt-auto pt-10 flex items-center justify-center gap-2 text-outline">
+<span class="material-symbols-outlined text-sm" data-icon="verified_user" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Enterprise Grade Security &amp; 256-bit Encryption</span>
+</div>
+</section>
+</main>
+<!-- Background Decorative Blobs -->
+<div class="fixed bottom-12 left-12 flex flex-col gap-2 z-0 opacity-40">
+<div class="w-16 h-1 bg-primary/20 rounded-full"></div>
+<div class="w-32 h-1 bg-primary/10 rounded-full"></div>
+<div class="w-24 h-1 bg-primary/5 rounded-full"></div>
+</div>
+</body></html>

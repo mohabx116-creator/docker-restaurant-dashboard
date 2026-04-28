@@ -11,11 +11,9 @@ function Topbar({
   pageTitle,
   searchTerm,
   onSearchChange,
-  onExport,
   onLogout,
   notificationCount,
   isBusy,
-  canExport,
   onToggleSidebar,
   isMobileSidebarOpen,
 }) {
@@ -33,10 +31,10 @@ function Topbar({
         </button>
 
         <div className="topbar-mobile-brand">
-          <div className="brand-mark">RD</div>
+          <div className="topbar-avatar">{getInitials(currentUser?.name)}</div>
           <div>
-            <strong>Restaurant Dashboard</strong>
-            <span>Dashboard Lite</span>
+            <strong>RestoDash Lite</strong>
+            <span>{pageTitle}</span>
           </div>
         </div>
       </div>
@@ -45,11 +43,11 @@ function Topbar({
         <span className="topbar-page-pill">{pageTitle}</span>
 
         <label className="topbar-search">
-          <span className="topbar-search-icon">/</span>
+          <span className="topbar-search-icon">Search</span>
           <span className="sr-only">Search</span>
           <input
             type="search"
-            placeholder="Search analytics, orders, or customers..."
+            placeholder="Search orders, customers..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
           />
@@ -58,24 +56,19 @@ function Topbar({
 
       <div className="topbar-actions">
         <button type="button" className="icon-button" aria-label="Notifications">
-          <span>!</span>
+          <span>NT</span>
           <small>{notificationCount}</small>
         </button>
 
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={onExport}
-          disabled={!canExport}
-        >
-          Export Snapshot
+        <button type="button" className="icon-button" aria-label="Help">
+          <span>HP</span>
         </button>
 
         <div className="topbar-user">
           <div className="topbar-avatar">{getInitials(currentUser?.name)}</div>
           <div className="topbar-user-meta">
             <strong>{currentUser?.name || "Restaurant Manager"}</strong>
-            <span>{currentUser?.email || "manager@dashboard.local"}</span>
+            <span>Executive workspace</span>
           </div>
         </div>
 

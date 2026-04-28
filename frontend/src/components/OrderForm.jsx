@@ -76,6 +76,7 @@ function OrderForm({
         <div className="form-actions">
           <button
             type="submit"
+            className="primary-button"
             disabled={
               isSavingOrder || customerName.trim() === "" || totalPrice === ""
             }
