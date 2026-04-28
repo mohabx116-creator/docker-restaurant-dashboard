@@ -1621,7 +1621,6 @@ function App() {
 
 
   const renderCartPage = () => {
-    const cartItemsCount = getCartItemsCount();
     const cartTotal = cartItems.reduce(
       (sum, item) => sum + Number(item.price) * item.quantity,
       0
@@ -1631,31 +1630,12 @@ function App() {
       <>
         {renderPageHero()}
 
-        <section className="cart-page-shell">
-          <div className="cart-page-main panel-card">
-            <div className="panel-header">
-              <div>
-                <span className="feedback-eyebrow">Selected items</span>
-                <h2>Order Cart</h2>
-                <p>
-                  Review every selected product, update quantities, remove items,
-                  then create a protected order from the cart.
-                </p>
-              </div>
-
-              <span className="panel-chip">
-                {cartItemsCount} item{cartItemsCount === 1 ? "" : "s"}
-              </span>
-            </div>
-
+        <section className="cart-page-layout">
+          <div className="cart-items-grid">
             {cartItems.length === 0 ? (
-              <div className="cart-page-empty">
-                <span className="cart-page-empty-icon">CT</span>
+              <div className="cart-empty-state">
                 <h3>Your cart is empty</h3>
-                <p>
-                  Add available menu items from Products / Menu to start building
-                  a new customer order.
-                </p>
+                <p>Add products from the menu to build a customer order.</p>
                 <button
                   type="button"
                   className="primary-button"
@@ -1665,64 +1645,47 @@ function App() {
                 </button>
               </div>
             ) : (
-              <div className="cart-page-items">
-                {cartItems.map((item) => (
-                  <article className="cart-page-item" key={item.product_id}>
-                    <img src={item.image_url} alt={item.name} />
+              cartItems.map((item) => (
+                <article className="cart-product-card" key={item.product_id}>
+                  <img src={item.image_url} alt={item.name} />
 
-                    <div className="cart-page-item-copy">
-                      <span className="product-category-badge">{item.category}</span>
-                      <h3>{item.name}</h3>
-                      <p>{formatCurrency(item.price)} each</p>
-                    </div>
+                  <div className="cart-product-info">
+                    <span className="product-category-badge">{item.category}</span>
+                    <h3>{item.name}</h3>
+                    <p>{formatCurrency(item.price)} each</p>
 
-                    <div className="cart-page-quantity">
-                      <button
-                        type="button"
-                        onClick={() => decreaseCartItem(item.product_id)}
-                        disabled={isCheckingOut}
-                        aria-label={`Decrease ${item.name}`}
-                      >
-                        −
-                      </button>
-                      <strong>{item.quantity}</strong>
-                      <button
-                        type="button"
-                        onClick={() => increaseCartItem(item.product_id)}
-                        disabled={isCheckingOut}
-                        aria-label={`Increase ${item.name}`}
-                      >
-                        +
-                      </button>
-                    </div>
+                    <div className="cart-card-footer">
+                      <div className="cart-qty-control">
+                        <button type="button" onClick={() => decreaseCartItem(item.product_id)}>
+                          −
+                        </button>
+                        <strong>{item.quantity}</strong>
+                        <button type="button" onClick={() => increaseCartItem(item.product_id)}>
+                          +
+                        </button>
+                      </div>
 
-                    <div className="cart-page-item-total">
-                      <span>Subtotal</span>
-                      <strong>{formatCurrency(Number(item.price) * item.quantity)}</strong>
+                      <strong className="cart-card-subtotal">
+                        {formatCurrency(Number(item.price) * item.quantity)}
+                      </strong>
                     </div>
 
                     <button
                       type="button"
-                      className="table-action-button danger-button"
+                      className="cart-remove-button"
                       onClick={() => removeCartItem(item.product_id)}
-                      disabled={isCheckingOut}
                     >
                       Remove
                     </button>
-                  </article>
-                ))}
-              </div>
+                  </div>
+                </article>
+              ))
             )}
           </div>
 
-          <aside className="cart-checkout-panel panel-card">
-            <div className="panel-header">
-              <div>
-                <span className="feedback-eyebrow">Checkout</span>
-                <h2>Order Summary</h2>
-                <p>Create a pending order from the selected cart items.</p>
-              </div>
-            </div>
+          <aside className="cart-summary-panel">
+            <span className="feedback-eyebrow">Checkout</span>
+            <h2>Order Summary</h2>
 
             <label className="form-field">
               <span>Customer Name</span>
@@ -1731,54 +1694,35 @@ function App() {
                 value={cartCustomerName}
                 onChange={(event) => setCartCustomerName(event.target.value)}
                 placeholder="Walk-in Guest"
-                disabled={isCheckingOut}
               />
             </label>
 
-            <div className="cart-summary-list">
-              <div>
-                <span>Total Items</span>
-                <strong>{cartItemsCount}</strong>
-              </div>
-              <div>
-                <span>Order Status</span>
-                <strong>Pending</strong>
-              </div>
-              <div className="cart-summary-total">
-                <span>Total</span>
-                <strong>{formatCurrency(cartTotal)}</strong>
-              </div>
+            <div className="cart-summary-row">
+              <span>Items</span>
+              <strong>{getCartItemsCount()}</strong>
             </div>
 
-            <div className="cart-checkout-actions">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={clearCart}
-                disabled={isCheckingOut || cartItems.length === 0}
-              >
-                Clear Cart
-              </button>
-              <button
-                type="button"
-                className="primary-button"
-                onClick={handleCheckoutCart}
-                disabled={
-                  isCheckingOut ||
-                  cartItems.length === 0 ||
-                  cartCustomerName.trim() === ""
-                }
-              >
-                {isCheckingOut ? "Creating Order..." : "Create Order"}
-              </button>
+            <div className="cart-summary-row total">
+              <span>Total</span>
+              <strong>{formatCurrency(cartTotal)}</strong>
             </div>
 
             <button
               type="button"
-              className="widget-link-button"
-              onClick={() => setActivePage("products")}
+              className="primary-button"
+              onClick={handleCheckoutCart}
+              disabled={cartItems.length === 0 || isCheckingOut}
             >
-              Continue Shopping
+              {isCheckingOut ? "Creating Order..." : "Create Order"}
+            </button>
+
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={clearCart}
+              disabled={cartItems.length === 0 || isCheckingOut}
+            >
+              Clear Cart
             </button>
           </aside>
         </section>
