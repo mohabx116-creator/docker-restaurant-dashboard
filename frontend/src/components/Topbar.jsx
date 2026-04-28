@@ -16,14 +16,28 @@ function Topbar({
   notificationCount,
   isBusy,
   canExport,
+  onToggleSidebar,
+  isMobileSidebarOpen,
 }) {
   return (
     <header className="topbar-shell">
-      <div className="topbar-mobile-brand">
-        <div className="brand-mark">RD</div>
-        <div>
-          <strong>Restaurant Dashboard</strong>
-          <span>Dashboard Lite</span>
+      <div className="topbar-mobile-row">
+        <button
+          type="button"
+          className="topbar-menu-button"
+          onClick={onToggleSidebar}
+          aria-label={isMobileSidebarOpen ? "Close navigation" : "Open navigation"}
+          aria-expanded={isMobileSidebarOpen}
+        >
+          {isMobileSidebarOpen ? "Close" : "Menu"}
+        </button>
+
+        <div className="topbar-mobile-brand">
+          <div className="brand-mark">RD</div>
+          <div>
+            <strong>Restaurant Dashboard</strong>
+            <span>Dashboard Lite</span>
+          </div>
         </div>
       </div>
 

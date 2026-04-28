@@ -14,15 +14,32 @@ const NAV_ITEMS = [
   { id: "settings", label: "Settings", symbol: "ST" },
 ];
 
-function Sidebar({ currentUser, activePage, onPageChange }) {
+function Sidebar({
+  currentUser,
+  activePage,
+  onPageChange,
+  isMobileOpen,
+  onClose,
+}) {
   return (
-    <aside className="sidebar-shell">
-      <div className="sidebar-brand">
-        <div className="brand-mark">RD</div>
-        <div className="sidebar-brand-copy">
-          <strong>Restaurant Dashboard</strong>
-          <span>Editorial Admin</span>
+    <aside className={`sidebar-shell ${isMobileOpen ? "mobile-open" : ""}`}>
+      <div className="sidebar-header">
+        <div className="sidebar-brand">
+          <div className="brand-mark">RD</div>
+          <div className="sidebar-brand-copy">
+            <strong>Restaurant Dashboard</strong>
+            <span>Editorial Admin</span>
+          </div>
         </div>
+
+        <button
+          type="button"
+          className="sidebar-close-button"
+          onClick={onClose}
+          aria-label="Close navigation"
+        >
+          Close
+        </button>
       </div>
 
       <p className="sidebar-copy">Dashboard Lite</p>
@@ -33,7 +50,10 @@ function Sidebar({ currentUser, activePage, onPageChange }) {
             key={item.id}
             type="button"
             className={activePage === item.id ? "active" : ""}
-            onClick={() => onPageChange(item.id)}
+            onClick={() => {
+              onPageChange(item.id);
+              onClose?.();
+            }}
             aria-current={activePage === item.id ? "page" : undefined}
           >
             <span className="sidebar-nav-icon">{item.symbol}</span>

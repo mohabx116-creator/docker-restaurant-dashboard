@@ -102,6 +102,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(parseStoredUser);
   const [orders, setOrders] = useState([]);
   const [activePage, setActivePage] = useState("overview");
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
@@ -155,6 +156,32 @@ function App() {
 
     setOrders([]);
   }, [token]);
+
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [activePage, token]);
+
+  useEffect(() => {
+    if (!isMobileSidebarOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobileSidebarOpen]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 900) {
+        setIsMobileSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const resetForm = () => {
     setCustomerName("");
@@ -219,6 +246,7 @@ function App() {
     localStorage.removeItem("restaurantUser");
     setToken("");
     setCurrentUser(null);
+    setIsMobileSidebarOpen(false);
     setOrders([]);
     setOrdersError("");
     setActivePage("overview");
@@ -1348,11 +1376,22 @@ function App() {
   }
 
   return (
-    <div className="dashboard-shell">
+    <div
+      className={`dashboard-shell ${isMobileSidebarOpen ? "mobile-nav-open" : ""}`}
+    >
       <Sidebar
         currentUser={displayUser}
         activePage={activePage}
         onPageChange={setActivePage}
+        isMobileOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
+      />
+
+      <button
+        type="button"
+        className={`sidebar-backdrop ${isMobileSidebarOpen ? "visible" : ""}`}
+        aria-label="Close navigation"
+        onClick={() => setIsMobileSidebarOpen(false)}
       />
 
       <main className="dashboard-main">
@@ -1367,6 +1406,10 @@ function App() {
             notificationCount={liveAttentionCount}
             isBusy={isBusy}
             canExport={sortedFilteredOrders.length > 0}
+            onToggleSidebar={() =>
+              setIsMobileSidebarOpen((currentValue) => !currentValue)
+            }
+            isMobileSidebarOpen={isMobileSidebarOpen}
           />
 
           {ordersError && <p className="status-message error">{ordersError}</p>}
