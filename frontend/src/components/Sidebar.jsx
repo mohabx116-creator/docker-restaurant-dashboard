@@ -6,7 +6,15 @@ const getInitials = (name = "") =>
     .map((part) => part[0]?.toUpperCase())
     .join("") || "RD";
 
-function Sidebar({ currentUser }) {
+const NAV_ITEMS = [
+  { id: "overview", label: "Overview" },
+  { id: "orders", label: "Orders" },
+  { id: "analytics", label: "Analytics" },
+  { id: "customers", label: "Customers" },
+  { id: "settings", label: "Settings" },
+];
+
+function Sidebar({ currentUser, activePage, onPageChange }) {
   return (
     <aside className="sidebar-shell">
       <div className="sidebar-brand">
@@ -22,11 +30,17 @@ function Sidebar({ currentUser }) {
       </p>
 
       <nav className="sidebar-nav">
-        <button type="button" className="active">Overview</button>
-        <button type="button">Orders</button>
-        <button type="button">Analytics</button>
-        <button type="button">Customers</button>
-        <button type="button">Settings</button>
+        {NAV_ITEMS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={activePage === item.id ? "active" : ""}
+            onClick={() => onPageChange(item.id)}
+            aria-current={activePage === item.id ? "page" : undefined}
+          >
+            {item.label}
+          </button>
+        ))}
       </nav>
 
       <div className="sidebar-user-card">

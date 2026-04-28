@@ -8,6 +8,7 @@ const getInitials = (name = "") =>
 
 function Topbar({
   currentUser,
+  pageTitle,
   searchTerm,
   onSearchChange,
   onExport,
@@ -26,6 +27,11 @@ function Topbar({
         </div>
       </div>
 
+      <div className="topbar-context">
+        <span>Current View</span>
+        <strong>{pageTitle}</strong>
+      </div>
+
       <label className="topbar-search">
         <span className="sr-only">Search</span>
         <input
@@ -38,7 +44,7 @@ function Topbar({
 
       <div className="topbar-actions">
         <button type="button" className="icon-button" aria-label="Notifications">
-          <span>🔔</span>
+          <span>!</span>
           <small>{notificationCount}</small>
         </button>
 
