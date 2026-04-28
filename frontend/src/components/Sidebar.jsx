@@ -22,11 +22,11 @@ function Sidebar({ currentUser }) {
       </p>
 
       <nav className="sidebar-nav">
-        <a className="active">Overview</a>
-        <a>Orders</a>
-        <a>Analytics</a>
-        <a>Customers</a>
-        <a>Settings</a>
+        <button type="button" className="active">Overview</button>
+        <button type="button">Orders</button>
+        <button type="button">Analytics</button>
+        <button type="button">Customers</button>
+        <button type="button">Settings</button>
       </nav>
 
       <div className="sidebar-user-card">

@@ -72,11 +72,13 @@ select:disabled {
 .panel-card,
 .kpi-card,
 .filters-panel,
-.overview-note-card {
+.overview-note-card,
+.widget-card {
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid var(--border);
   border-radius: 24px;
   box-shadow: var(--shadow);
+  min-width: 0;
 }
 
 .auth-card {
@@ -119,6 +121,12 @@ select:disabled {
   margin: 0;
 }
 
+.panel-header h2,
+.filters-panel h2 {
+  font-size: clamp(1.375rem, 1.7vw, 1.625rem);
+  line-height: 1.1;
+}
+
 .auth-card p {
   margin: 12px 0 24px;
   color: var(--muted);
@@ -137,6 +145,7 @@ select:disabled {
 .form-field select,
 .filter-field select {
   width: 100%;
+  min-height: 48px;
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 13px 14px;
@@ -222,18 +231,20 @@ select:disabled {
   gap: 8px;
 }
 
-.sidebar-nav a {
+.sidebar-nav button {
   min-height: 46px;
   padding: 12px 14px;
   border-radius: 14px;
+  border: 0;
   color: #f6ece6;
+  text-align: left;
   background: rgba(255, 255, 255, 0.03);
   cursor: pointer;
   transition: transform 0.2s ease, background 0.2s ease;
 }
 
-.sidebar-nav a.active,
-.sidebar-nav a:hover {
+.sidebar-nav button.active,
+.sidebar-nav button:hover {
   background: rgba(255, 237, 213, 0.12);
   transform: translateX(4px);
 }
@@ -427,6 +438,10 @@ select:disabled {
   margin-bottom: 24px;
 }
 
+.overview-actions {
+  display: grid;
+}
+
 .hero-eyebrow,
 .note-label,
 .kpi-label,
@@ -474,6 +489,7 @@ select:disabled {
   display: grid;
   gap: 8px;
   align-content: center;
+  height: 100%;
   min-height: 162px;
 }
 
@@ -592,6 +608,10 @@ select:disabled {
   font-size: clamp(1.8rem, 2.2vw, 2.2rem);
   letter-spacing: -0.04em;
   line-height: 1.05;
+}
+
+.kpi-label {
+  color: var(--muted);
 }
 
 .kpi-description {
@@ -793,6 +813,16 @@ select:disabled {
   vertical-align: middle;
 }
 
+.orders-table td:first-child,
+.orders-table td:nth-child(4),
+.orders-table td:nth-child(5) {
+  white-space: nowrap;
+}
+
+.orders-table td:nth-child(2) {
+  min-width: 180px;
+}
+
 .orders-table th {
   font-size: 12px;
   font-weight: 800;
@@ -933,7 +963,6 @@ select:disabled {
   }
 
   .topbar-shell,
-  .topbar-actions,
   .panel-header,
   .filters-controls,
   .form-actions,
@@ -944,7 +973,7 @@ select:disabled {
 
   .topbar-actions {
     width: 100%;
-    justify-content: stretch;
+    justify-content: flex-start;
   }
 
   .filters-panel {
@@ -975,15 +1004,23 @@ select:disabled {
     border-radius: 20px;
   }
 
-  .topbar-actions,
   .dashboard-column-right,
   .kpi-grid,
   .secondary-kpi-grid {
     grid-template-columns: 1fr;
   }
 
+  .topbar-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topbar-actions .icon-button {
+    align-self: flex-start;
+  }
+
   .overview-hero h1 {
-    font-size: 2.2rem;
+    font-size: 2rem;
   }
 
   .widget-metrics {
