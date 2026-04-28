@@ -79,6 +79,35 @@ function normalizeProductAvailability(value, fallbackValue = true) {
     return fallbackValue;
 }
 
+function normalizeCartItems(items) {
+    if (!Array.isArray(items)) {
+        return [];
+    }
+
+    const mergedItems = new Map();
+
+    for (const item of items) {
+        const productId = Number(item.product_id);
+        const quantity = Number(item.quantity);
+
+        if (
+            !Number.isInteger(productId) ||
+            productId <= 0 ||
+            !Number.isInteger(quantity) ||
+            quantity <= 0
+        ) {
+            continue;
+        }
+
+        mergedItems.set(productId, (mergedItems.get(productId) || 0) + quantity);
+    }
+
+    return Array.from(mergedItems.entries()).map(([product_id, quantity]) => ({
+        product_id,
+        quantity,
+    }));
+}
+
 async function seedProductsIfEmpty() {
     const countResult = await pool.query("SELECT COUNT(*)::int AS count FROM products");
     const existingCount = countResult.rows[0]?.count || 0;
@@ -138,6 +167,17 @@ async function initDB() {
         )
     `);
 
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS order_items (
+            id SERIAL PRIMARY KEY,
+            order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES products(id),
+            quantity INTEGER NOT NULL CHECK (quantity > 0),
+            unit_price NUMERIC NOT NULL CHECK (unit_price >= 0),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
     await pool.query(
         "ALTER TABLE orders ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'"
     );
@@ -162,6 +202,12 @@ async function initDB() {
     );
     await pool.query(
         "UPDATE products SET is_available = true WHERE is_available IS NULL"
+    );
+
+    await pool.query("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS quantity INTEGER");
+    await pool.query("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS unit_price NUMERIC");
+    await pool.query(
+        "ALTER TABLE order_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
     );
 
     await seedProductsIfEmpty();
@@ -264,10 +310,140 @@ app.post("/orders", authenticateToken, async (req, res) => {
     res.json(result.rows[0]);
 });
 
+app.post("/orders/cart", authenticateToken, async (req, res) => {
+    const normalizedCustomerName = String(req.body.customer_name || "").trim();
+    const normalizedItems = normalizeCartItems(req.body.items);
+
+    if (!normalizedCustomerName) {
+        return res.status(400).json({ message: "Customer name is required." });
+    }
+
+    if (normalizedItems.length === 0) {
+        return res.status(400).json({ message: "Cart items are required." });
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const productIds = normalizedItems.map((item) => item.product_id);
+
+        const productsResult = await client.query(
+            `SELECT id, name, price, image_url, category, is_available
+             FROM products
+             WHERE id = ANY($1::int[])`,
+            [productIds]
+        );
+
+        const productsById = new Map(
+            productsResult.rows.map((product) => [Number(product.id), product])
+        );
+
+        for (const item of normalizedItems) {
+            const product = productsById.get(item.product_id);
+
+            if (!product) {
+                throw new Error(`Product ${item.product_id} was not found.`);
+            }
+
+            if (!product.is_available) {
+                throw new Error(`${product.name} is currently out of stock.`);
+            }
+        }
+
+        const totalPrice = normalizedItems.reduce((sum, item) => {
+            const product = productsById.get(item.product_id);
+            return sum + Number(product.price) * item.quantity;
+        }, 0);
+
+        const orderResult = await client.query(
+            `INSERT INTO orders (customer_name, total_price, user_id, status)
+             VALUES ($1, $2, $3, $4)
+             RETURNING *`,
+            [normalizedCustomerName, totalPrice, req.user.id, "pending"]
+        );
+
+        const order = orderResult.rows[0];
+        const createdItems = [];
+
+        for (const item of normalizedItems) {
+            const product = productsById.get(item.product_id);
+
+            const itemResult = await client.query(
+                `INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+                 VALUES ($1, $2, $3, $4)
+                 RETURNING *`,
+                [order.id, item.product_id, item.quantity, Number(product.price)]
+            );
+
+            createdItems.push({
+                ...itemResult.rows[0],
+                product_name: product.name,
+                image_url: product.image_url,
+                category: product.category,
+                subtotal: Number(product.price) * item.quantity,
+            });
+        }
+
+        await client.query("COMMIT");
+
+        res.status(201).json({
+            ...order,
+            total_price: Number(order.total_price),
+            items: createdItems,
+        });
+    } catch (error) {
+        await client.query("ROLLBACK");
+
+        res.status(400).json({
+            message:
+                error instanceof Error
+                    ? error.message
+                    : "Failed to create order from cart.",
+        });
+    } finally {
+        client.release();
+    }
+});
+
 app.get("/orders", authenticateToken, async (req, res) => {
     const result = await pool.query(
         "SELECT * FROM orders WHERE user_id = $1 ORDER BY id DESC",
         [req.user.id]
+    );
+
+    res.json(result.rows);
+});
+
+app.get("/orders/:id/items", authenticateToken, async (req, res) => {
+    const { id } = req.params;
+
+    const orderCheck = await pool.query(
+        "SELECT id FROM orders WHERE id = $1 AND user_id = $2",
+        [id, req.user.id]
+    );
+
+    if (orderCheck.rows.length === 0) {
+        return res.status(404).json({ message: "Order not found." });
+    }
+
+    const result = await pool.query(
+        `SELECT
+            oi.id,
+            oi.order_id,
+            oi.product_id,
+            oi.quantity,
+            oi.unit_price,
+            p.name,
+            p.image_url,
+            p.category,
+            (oi.quantity * oi.unit_price) AS subtotal
+         FROM order_items oi
+         JOIN products p ON p.id = oi.product_id
+         WHERE oi.order_id = $1
+         ORDER BY oi.id ASC`,
+        [id]
     );
 
     res.json(result.rows);
