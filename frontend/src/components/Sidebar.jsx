@@ -8,6 +8,7 @@ const getInitials = (name = "") =>
 
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", symbol: "OV" },
+  { id: "products", label: "Products / Menu", symbol: "MN" },
   { id: "orders", label: "Orders", symbol: "OR" },
   { id: "analytics", label: "Analytics", symbol: "AN" },
   { id: "customers", label: "Customers", symbol: "CU" },
@@ -20,7 +21,8 @@ function Sidebar({
   onPageChange,
   isMobileOpen,
   onClose,
-  onCreateOrder,
+  primaryActionLabel,
+  onPrimaryAction,
   onLogout,
 }) {
   return (
@@ -45,7 +47,7 @@ function Sidebar({
       </div>
 
       <p className="sidebar-copy">
-        Executive view for live orders, revenue performance, and customer service.
+        Executive view for live orders, menu control, revenue performance, and customer service.
       </p>
 
       <nav className="sidebar-nav">
@@ -71,11 +73,11 @@ function Sidebar({
           type="button"
           className="primary-button sidebar-cta-button"
           onClick={() => {
-            onCreateOrder?.();
+            onPrimaryAction?.();
             onClose?.();
           }}
         >
-          New Order
+          {primaryActionLabel}
         </button>
 
         <div className="sidebar-user-card">

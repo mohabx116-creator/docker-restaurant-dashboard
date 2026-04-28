@@ -3,10 +3,12 @@ const cors = require("cors");
 require("dotenv").config();
 
 const pool = require("./db");
+const productCatalog = require("./productCatalog");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 const app = express();
+
 const ORDER_STATUSES = new Set(["pending", "preparing", "completed"]);
 const DEFAULT_CLIENT_URL = "http://localhost:5173";
 const normalizeOrigin = (value) => String(value || "").trim().replace(/\/$/, "");
@@ -37,6 +39,70 @@ function normalizeOrderStatus(status = "pending") {
     return ORDER_STATUSES.has(normalizedStatus) ? normalizedStatus : null;
 }
 
+function normalizeProductName(value) {
+    const normalizedValue = String(value || "").trim();
+    return normalizedValue || null;
+}
+
+function normalizeProductCategory(value) {
+    const normalizedValue = String(value || "").trim();
+    return normalizedValue || null;
+}
+
+function normalizeProductDescription(value) {
+    const normalizedValue = String(value || "").trim();
+    return normalizedValue || "";
+}
+
+function normalizeProductImageUrl(value) {
+    const normalizedValue = String(value || "").trim();
+    return normalizedValue || "";
+}
+
+function normalizeProductPrice(value) {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : null;
+}
+
+function normalizeProductAvailability(value, fallbackValue = true) {
+    if (typeof value === "boolean") {
+        return value;
+    }
+
+    if (typeof value === "string") {
+        const normalizedValue = value.trim().toLowerCase();
+
+        if (normalizedValue === "true") return true;
+        if (normalizedValue === "false") return false;
+    }
+
+    return fallbackValue;
+}
+
+async function seedProductsIfEmpty() {
+    const countResult = await pool.query("SELECT COUNT(*)::int AS count FROM products");
+    const existingCount = countResult.rows[0]?.count || 0;
+
+    if (existingCount > 0) {
+        return;
+    }
+
+    for (const product of productCatalog) {
+        await pool.query(
+            `INSERT INTO products (name, description, price, image_url, category, is_available)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+                product.name,
+                product.description,
+                product.price,
+                product.imageUrl,
+                product.category,
+                product.isAvailable,
+            ]
+        );
+    }
+}
+
 async function initDB() {
     await pool.query(`
         CREATE TABLE IF NOT EXISTS users (
@@ -59,6 +125,19 @@ async function initDB() {
         )
     `);
 
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS products (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            price NUMERIC NOT NULL,
+            image_url TEXT,
+            category TEXT NOT NULL,
+            is_available BOOLEAN DEFAULT true,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
     await pool.query(
         "ALTER TABLE orders ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'"
     );
@@ -72,11 +151,26 @@ async function initDB() {
         "UPDATE orders SET status = 'pending' WHERE status IS NULL OR status NOT IN ('pending', 'preparing', 'completed')"
     );
 
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT");
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT");
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT");
+    await pool.query(
+        "ALTER TABLE products ADD COLUMN IF NOT EXISTS is_available BOOLEAN DEFAULT true"
+    );
+    await pool.query(
+        "ALTER TABLE products ALTER COLUMN is_available SET DEFAULT true"
+    );
+    await pool.query(
+        "UPDATE products SET is_available = true WHERE is_available IS NULL"
+    );
+
+    await seedProductsIfEmpty();
+
     console.log("DB Ready");
 }
 
 function authenticateToken(req, res, next) {
-    const authHeader = req.headers["authorization"];
+    const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(" ")[1];
 
     if (!token) {
@@ -189,10 +283,10 @@ app.put("/orders/:id", authenticateToken, async (req, res) => {
     }
 
     const result = await pool.query(
-        `UPDATE orders 
-     SET customer_name = $1, total_price = $2, status = $3
-      WHERE id = $4 AND user_id = $5
-      RETURNING *`,
+        `UPDATE orders
+         SET customer_name = $1, total_price = $2, status = $3
+         WHERE id = $4 AND user_id = $5
+         RETURNING *`,
         [customer_name, total_price, normalizedStatus, id, req.user.id]
     );
 
@@ -216,6 +310,115 @@ app.delete("/orders/:id", authenticateToken, async (req, res) => {
     }
 
     res.json({ message: "Order deleted successfully" });
+});
+
+app.get("/products", authenticateToken, async (req, res) => {
+    const result = await pool.query(
+        "SELECT * FROM products ORDER BY category ASC, name ASC, id ASC"
+    );
+
+    res.json(result.rows);
+});
+
+app.post("/products", authenticateToken, async (req, res) => {
+    const normalizedName = normalizeProductName(req.body.name);
+    const normalizedCategory = normalizeProductCategory(req.body.category);
+    const normalizedPrice = normalizeProductPrice(req.body.price);
+
+    if (!normalizedName || !normalizedCategory || normalizedPrice === null) {
+        return res.status(400).json({
+            message: "Product name, category, and a valid price are required.",
+        });
+    }
+
+    const result = await pool.query(
+        `INSERT INTO products (name, description, price, image_url, category, is_available)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [
+            normalizedName,
+            normalizeProductDescription(req.body.description),
+            normalizedPrice,
+            normalizeProductImageUrl(req.body.image_url),
+            normalizedCategory,
+            normalizeProductAvailability(req.body.is_available, true),
+        ]
+    );
+
+    res.status(201).json(result.rows[0]);
+});
+
+app.put("/products/:id", authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const normalizedName = normalizeProductName(req.body.name);
+    const normalizedCategory = normalizeProductCategory(req.body.category);
+    const normalizedPrice = normalizeProductPrice(req.body.price);
+
+    if (!normalizedName || !normalizedCategory || normalizedPrice === null) {
+        return res.status(400).json({
+            message: "Product name, category, and a valid price are required.",
+        });
+    }
+
+    const result = await pool.query(
+        `UPDATE products
+         SET name = $1,
+             description = $2,
+             price = $3,
+             image_url = $4,
+             category = $5,
+             is_available = $6
+         WHERE id = $7
+         RETURNING *`,
+        [
+            normalizedName,
+            normalizeProductDescription(req.body.description),
+            normalizedPrice,
+            normalizeProductImageUrl(req.body.image_url),
+            normalizedCategory,
+            normalizeProductAvailability(req.body.is_available, true),
+            id,
+        ]
+    );
+
+    if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.json(result.rows[0]);
+});
+
+app.delete("/products/:id", authenticateToken, async (req, res) => {
+    const { id } = req.params;
+
+    const result = await pool.query(
+        "DELETE FROM products WHERE id = $1 RETURNING *",
+        [id]
+    );
+
+    if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.json({ message: "Product deleted successfully" });
+});
+
+app.patch("/products/:id/toggle", authenticateToken, async (req, res) => {
+    const { id } = req.params;
+
+    const result = await pool.query(
+        `UPDATE products
+         SET is_available = NOT is_available
+         WHERE id = $1
+         RETURNING *`,
+        [id]
+    );
+
+    if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.json(result.rows[0]);
 });
 
 const PORT = process.env.PORT || 3001;

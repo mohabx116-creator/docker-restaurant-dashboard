@@ -7,6 +7,10 @@ import AnalyticsChart from "./components/AnalyticsChart";
 import OrdersTable from "./components/OrdersTable";
 import OrderForm from "./components/OrderForm";
 import BottomNav from "./components/BottomNav";
+import ProductsGrid from "./components/ProductsGrid";
+import ProductModal from "./components/ProductModal";
+import ToastStack from "./components/ToastStack";
+import ConfirmDialog from "./components/ConfirmDialog";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -16,10 +20,13 @@ const ORDER_STATUSES = [
   { value: "completed", label: "Completed" },
 ];
 
-const OVERVIEW_CHART_RANGES = [
-  { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
+const PRODUCT_CATEGORIES = [
+  "Burgers",
+  "Pizzas",
+  "Pasta",
+  "Salads",
+  "Desserts",
+  "Drinks",
 ];
 
 const STATUS_LABELS = ORDER_STATUSES.reduce((acc, status) => {
@@ -32,8 +39,13 @@ const PAGE_META = {
     title: "Dashboard Overview",
     navTitle: "Overview",
     eyebrow: "Overview",
-    subtitle:
-      "Welcome back. Here's what's happening in your restaurant today.",
+    subtitle: "Welcome back. Here's what's happening in your restaurant today.",
+  },
+  products: {
+    title: "Products / Menu",
+    navTitle: "Products",
+    eyebrow: "Menu management",
+    subtitle: "Manage food items, pricing, categories, and availability.",
   },
   orders: {
     title: "Orders",
@@ -91,12 +103,9 @@ const formatCurrency = (value) => `$${Number(value || 0).toFixed(2)}`;
 
 const formatAxisCurrency = (value) => {
   const numericValue = Number(value || 0);
-
-  if (numericValue >= 1000) {
-    return `$${(numericValue / 1000).toFixed(1)}k`;
-  }
-
-  return `$${numericValue}`;
+  return numericValue >= 1000
+    ? `$${(numericValue / 1000).toFixed(1)}k`
+    : `$${numericValue}`;
 };
 
 const formatDate = (value) => {
@@ -112,67 +121,199 @@ const formatDate = (value) => {
   }).format(date);
 };
 
+const formatProductAvailability = (value) => (value ? "Available" : "Out of Stock");
+
+const getFallbackProductImage = () => "/products/smokehouse-royale-burger.jpg";
+
 function App() {
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState("");
-  const [token, setToken] = useState(localStorage.getItem("token") || "");
-  const [currentUser, setCurrentUser] = useState(parseStoredUser);
-  const [orders, setOrders] = useState([]);
-  const [activePage, setActivePage] = useState("overview");
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [isAuthLoading, setIsAuthLoading] = useState(false);
-  const [isOrdersLoading, setIsOrdersLoading] = useState(false);
-  const [isSavingOrder, setIsSavingOrder] = useState(false);
-  const [deletingOrderId, setDeletingOrderId] = useState(null);
-  const [ordersError, setOrdersError] = useState("");
-
   const [email, setEmail] = useState("mohab@test.com");
   const [password, setPassword] = useState("123456");
+  const [token, setToken] = useState(localStorage.getItem("token") || "");
+  const [currentUser, setCurrentUser] = useState(parseStoredUser);
+  const [activePage, setActivePage] = useState("overview");
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const [confirmDialog, setConfirmDialog] = useState(null);
+
+  const [orders, setOrders] = useState([]);
+  const [products, setProducts] = useState([]);
+
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [isOrdersLoading, setIsOrdersLoading] = useState(false);
+  const [isProductsLoading, setIsProductsLoading] = useState(false);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
+  const [deletingOrderId, setDeletingOrderId] = useState(null);
+  const [deletingProductId, setDeletingProductId] = useState(null);
+  const [togglingProductId, setTogglingProductId] = useState(null);
+
+  const [ordersError, setOrdersError] = useState("");
+  const [productsError, setProductsError] = useState("");
 
   const [customerName, setCustomerName] = useState("");
   const [totalPrice, setTotalPrice] = useState("");
   const [orderStatus, setOrderStatus] = useState("pending");
   const [editingOrderId, setEditingOrderId] = useState(null);
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const [productFormOpen, setProductFormOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [productForm, setProductForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    category: PRODUCT_CATEGORIES[0],
+    image_url: getFallbackProductImage(),
+    is_available: true,
+  });
+
+  const [ordersSearchQuery, setOrdersSearchQuery] = useState("");
+  const [productSearchQuery, setProductSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [overviewChartRange, setOverviewChartRange] = useState("weekly");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedAvailability, setSelectedAvailability] = useState("all");
+  const [sortBy, setSortBy] = useState("name-asc");
+
+  const addToast = (title, message, type = "info") => {
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setToasts((currentToasts) => [...currentToasts, { id, title, message, type }]);
+
+    window.setTimeout(() => {
+      setToasts((currentToasts) =>
+        currentToasts.filter((toast) => toast.id !== id)
+      );
+    }, 3600);
+  };
+
+  const dismissToast = (id) => {
+    setToasts((currentToasts) =>
+      currentToasts.filter((toast) => toast.id !== id)
+    );
+  };
+
+  const apiRequest = async (path, options = {}) => {
+    const { method = "GET", body, auth = true } = options;
+    const headers = {};
+
+    if (body !== undefined) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    if (auth && token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_URL}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+
+    const responseText = await response.text();
+    let data = null;
+
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        data = null;
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(data?.message || "Request failed");
+    }
+
+    return data;
+  };
+
+  const getDefaultImageForCategory = (category, productList = products) => {
+    const match = productList.find(
+      (product) => product.category === category && product.image_url
+    );
+
+    return match?.image_url || productList[0]?.image_url || getFallbackProductImage();
+  };
+
+  const createEmptyProductForm = (category = PRODUCT_CATEGORIES[0]) => ({
+    name: "",
+    description: "",
+    price: "",
+    category,
+    image_url: getDefaultImageForCategory(category),
+    is_available: true,
+  });
+
+  const resetOrderForm = () => {
+    setCustomerName("");
+    setTotalPrice("");
+    setOrderStatus("pending");
+    setEditingOrderId(null);
+  };
+
+  const resetProductForm = (category = PRODUCT_CATEGORIES[0]) => {
+    setProductForm(createEmptyProductForm(category));
+    setEditingProduct(null);
+  };
+
+  const clearOrderFilters = () => {
+    setOrdersSearchQuery("");
+    setStatusFilter("all");
+  };
+
+  const clearProductFilters = () => {
+    setProductSearchQuery("");
+    setSelectedCategory("all");
+    setSelectedAvailability("all");
+    setSortBy("name-asc");
+  };
 
   const fetchOrders = async () => {
-    if (!token) return null;
+    if (!token) return;
 
     setIsOrdersLoading(true);
     setOrdersError("");
 
     try {
-      const res = await fetch(`${API_URL}/orders`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to load orders");
-      }
-
-      setOrders(data);
-      return data;
+      const data = await apiRequest("/orders");
+      setOrders(data || []);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to load orders";
       setOrdersError(message);
-      return null;
     } finally {
       setIsOrdersLoading(false);
     }
   };
 
+  const fetchProducts = async () => {
+    if (!token) return;
+
+    setIsProductsLoading(true);
+    setProductsError("");
+
+    try {
+      const data = await apiRequest("/products");
+      setProducts(data || []);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load products";
+      setProductsError(message);
+    } finally {
+      setIsProductsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (token) {
-      fetchOrders();
+    if (!token) {
+      setOrders([]);
+      setProducts([]);
       return;
     }
 
-    setOrders([]);
+    fetchOrders();
+    fetchProducts();
   }, [token]);
 
   useEffect(() => {
@@ -180,7 +321,10 @@ function App() {
   }, [activePage, token]);
 
   useEffect(() => {
-    if (!isMobileSidebarOpen) return undefined;
+    const shouldLockBody =
+      isMobileSidebarOpen || productFormOpen || Boolean(confirmDialog);
+
+    if (!shouldLockBody) return undefined;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -188,7 +332,7 @@ function App() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [isMobileSidebarOpen]);
+  }, [confirmDialog, isMobileSidebarOpen, productFormOpen]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -201,52 +345,29 @@ function App() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const resetForm = () => {
-    setCustomerName("");
-    setTotalPrice("");
-    setOrderStatus("pending");
-    setEditingOrderId(null);
-  };
-
-  const clearFilters = () => {
-    setSearchTerm("");
-    setStatusFilter("all");
-  };
-
-  const openCreateOrder = () => {
-    resetForm();
-    setActivePage("orders");
-  };
-
-  const handleAuth = async (e) => {
-    e.preventDefault();
-
-    const url = isRegister
-      ? `${API_URL}/auth/register`
-      : `${API_URL}/auth/login`;
-    const body = isRegister
-      ? { name, email, password }
-      : { email, password };
-
+  const handleAuth = async (event) => {
+    event.preventDefault();
     setIsAuthLoading(true);
 
     try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Authentication failed");
-      }
+      const data = await apiRequest(
+        isRegister ? "/auth/register" : "/auth/login",
+        {
+          method: "POST",
+          auth: false,
+          body: isRegister ? { name, email, password } : { email, password },
+        }
+      );
 
       if (isRegister) {
-        alert("Account created successfully. Please login.");
         setIsRegister(false);
         setName("");
         setPassword("");
+        addToast(
+          "Account created",
+          "Your account is ready. Login to access the dashboard.",
+          "success"
+        );
         return;
       }
 
@@ -255,10 +376,17 @@ function App() {
       setCurrentUser(data.user || null);
       setToken(data.token);
       setActivePage("overview");
+      addToast(
+        "Welcome back",
+        "Signed in successfully. Live orders and menu data are now available.",
+        "success"
+      );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Authentication failed";
-      alert(message);
+      addToast(
+        "Authentication failed",
+        error instanceof Error ? error.message : "Authentication failed",
+        "error"
+      );
     } finally {
       setIsAuthLoading(false);
     }
@@ -269,54 +397,55 @@ function App() {
     localStorage.removeItem("restaurantUser");
     setToken("");
     setCurrentUser(null);
-    setIsMobileSidebarOpen(false);
     setOrders([]);
+    setProducts([]);
     setOrdersError("");
+    setProductsError("");
     setActivePage("overview");
-    resetForm();
-    clearFilters();
+    setIsMobileSidebarOpen(false);
+    setConfirmDialog(null);
+    setProductFormOpen(false);
+    resetOrderForm();
+    resetProductForm();
+    clearOrderFilters();
+    clearProductFilters();
   };
 
-  const handleSubmitOrder = async (e) => {
-    e.preventDefault();
+  const handleSubmitOrder = async (event) => {
+    event.preventDefault();
 
     const trimmedCustomerName = customerName.trim();
     if (!trimmedCustomerName) return;
 
-    const isEditing = Boolean(editingOrderId);
-    const url = isEditing
-      ? `${API_URL}/orders/${editingOrderId}`
-      : `${API_URL}/orders`;
-    const method = isEditing ? "PUT" : "POST";
-
     setIsSavingOrder(true);
 
     try {
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      const isEditing = Boolean(editingOrderId);
+      await apiRequest(isEditing ? `/orders/${editingOrderId}` : "/orders", {
+        method: isEditing ? "PUT" : "POST",
+        body: {
           customer_name: trimmedCustomerName,
           total_price: Number(totalPrice),
           status: getOrderStatus(orderStatus),
-        }),
+        },
       });
-      const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to save order");
-      }
-
-      resetForm();
+      resetOrderForm();
       await fetchOrders();
       setActivePage("orders");
+      addToast(
+        isEditing ? "Order updated" : "Order created",
+        isEditing
+          ? "The selected order was updated successfully."
+          : "The new order was added successfully.",
+        "success"
+      );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to save order";
-      alert(message);
+      addToast(
+        "Unable to save order",
+        error instanceof Error ? error.message : "Failed to save order",
+        "error"
+      );
     } finally {
       setIsSavingOrder(false);
     }
@@ -330,47 +459,213 @@ function App() {
     setActivePage("orders");
   };
 
-  const handleDeleteOrder = async (id) => {
-    const confirmDelete = window.confirm("Delete this order?");
-    if (!confirmDelete) return;
+  const handleProductFormChange = (field, value) => {
+    setProductForm((currentForm) => {
+      if (field === "category") {
+        const shouldSwapImage =
+          !currentForm.image_url ||
+          currentForm.image_url === getDefaultImageForCategory(currentForm.category);
 
-    setDeletingOrderId(id);
+        return {
+          ...currentForm,
+          category: value,
+          image_url: shouldSwapImage
+            ? getDefaultImageForCategory(value)
+            : currentForm.image_url,
+        };
+      }
+
+      return {
+        ...currentForm,
+        [field]: value,
+      };
+    });
+  };
+
+  const openCreateOrder = () => {
+    resetOrderForm();
+    setActivePage("orders");
+  };
+
+  const openCreateProduct = () => {
+    setActivePage("products");
+    setEditingProduct(null);
+    setProductForm(createEmptyProductForm());
+    setProductFormOpen(true);
+  };
+
+  const openEditProduct = (product) => {
+    setActivePage("products");
+    setEditingProduct(product);
+    setProductForm({
+      name: product.name,
+      description: product.description || "",
+      price: String(product.price),
+      category: product.category,
+      image_url: product.image_url || getDefaultImageForCategory(product.category),
+      is_available: Boolean(product.is_available),
+    });
+    setProductFormOpen(true);
+  };
+
+  const handleSubmitProduct = async (event) => {
+    event.preventDefault();
+    setIsSavingProduct(true);
 
     try {
-      const res = await fetch(`${API_URL}/orders/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const isEditing = Boolean(editingProduct);
+      await apiRequest(isEditing ? `/products/${editingProduct.id}` : "/products", {
+        method: isEditing ? "PUT" : "POST",
+        body: {
+          name: productForm.name.trim(),
+          description: productForm.description.trim(),
+          price: Number(productForm.price),
+          image_url: productForm.image_url,
+          category: productForm.category,
+          is_available: productForm.is_available,
         },
       });
-      const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to delete order");
-      }
-
-      if (editingOrderId === id) {
-        resetForm();
-      }
-
-      await fetchOrders();
+      await fetchProducts();
+      setProductFormOpen(false);
+      setEditingProduct(null);
+      setProductForm(createEmptyProductForm(productForm.category));
+      addToast(
+        isEditing ? "Product updated" : "Product added",
+        isEditing
+          ? "Menu item details were updated successfully."
+          : "The new menu item was added successfully.",
+        "success"
+      );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to delete order";
-      alert(message);
+      addToast(
+        "Unable to save product",
+        error instanceof Error ? error.message : "Failed to save product",
+        "error"
+      );
     } finally {
-      setDeletingOrderId(null);
+      setIsSavingProduct(false);
     }
   };
 
-  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
-  const hasActiveFilters =
-    normalizedSearchTerm !== "" || statusFilter !== "all";
+  const handleToggleProduct = async (productId) => {
+    setTogglingProductId(productId);
+
+    try {
+      const updatedProduct = await apiRequest(`/products/${productId}/toggle`, {
+        method: "PATCH",
+      });
+
+      setProducts((currentProducts) =>
+        currentProducts.map((product) =>
+          product.id === productId ? updatedProduct : product
+        )
+      );
+
+      addToast(
+        "Availability updated",
+        `${updatedProduct.name} is now ${formatProductAvailability(
+          updatedProduct.is_available
+        ).toLowerCase()}.`,
+        "success"
+      );
+    } catch (error) {
+      addToast(
+        "Toggle failed",
+        error instanceof Error ? error.message : "Failed to update product availability",
+        "error"
+      );
+    } finally {
+      setTogglingProductId(null);
+    }
+  };
+
+  const requestDeleteOrder = (orderId) => {
+    const order = orders.find((item) => item.id === orderId);
+    setConfirmDialog({
+      type: "order",
+      id: orderId,
+      title: "Delete order?",
+      message: order
+        ? `Remove order #${order.id} for ${getCustomerLabel(order.customer_name)} permanently.`
+        : "Delete this order permanently from the current account?",
+      confirmLabel: "Delete Order",
+      eyebrow: "Order action",
+    });
+  };
+
+  const requestDeleteProduct = (product) => {
+    setConfirmDialog({
+      type: "product",
+      id: product.id,
+      title: "Delete product?",
+      message: `Remove ${product.name} from the menu catalog permanently.`,
+      confirmLabel: "Delete Product",
+      eyebrow: "Menu action",
+    });
+  };
+
+  const handleConfirmDialog = async () => {
+    if (!confirmDialog) return;
+
+    if (confirmDialog.type === "order") {
+      setDeletingOrderId(confirmDialog.id);
+
+      try {
+        await apiRequest(`/orders/${confirmDialog.id}`, { method: "DELETE" });
+
+        if (editingOrderId === confirmDialog.id) {
+          resetOrderForm();
+        }
+
+        await fetchOrders();
+        addToast("Order deleted", "The selected order was removed.", "success");
+      } catch (error) {
+        addToast(
+          "Delete failed",
+          error instanceof Error ? error.message : "Failed to delete order",
+          "error"
+        );
+      } finally {
+        setDeletingOrderId(null);
+        setConfirmDialog(null);
+      }
+
+      return;
+    }
+
+    setDeletingProductId(confirmDialog.id);
+
+    try {
+      await apiRequest(`/products/${confirmDialog.id}`, { method: "DELETE" });
+
+      if (editingProduct?.id === confirmDialog.id) {
+        setProductFormOpen(false);
+        setEditingProduct(null);
+        resetProductForm();
+      }
+
+      await fetchProducts();
+      addToast("Product deleted", "The selected menu item was removed.", "success");
+    } catch (error) {
+      addToast(
+        "Delete failed",
+        error instanceof Error ? error.message : "Failed to delete product",
+        "error"
+      );
+    } finally {
+      setDeletingProductId(null);
+      setConfirmDialog(null);
+    }
+  };
+
+  const normalizedOrdersSearchQuery = ordersSearchQuery.trim().toLowerCase();
+  const normalizedProductSearchQuery = productSearchQuery.trim().toLowerCase();
 
   const filteredOrders = orders.filter((order) => {
     const orderName = getCustomerLabel(order.customer_name).toLowerCase();
     const orderStatusValue = getOrderStatus(order.status);
-    const matchesSearch = orderName.includes(normalizedSearchTerm);
+    const matchesSearch = orderName.includes(normalizedOrdersSearchQuery);
     const matchesStatus =
       statusFilter === "all" || orderStatusValue === statusFilter;
 
@@ -386,6 +681,48 @@ function App() {
 
     return Number(b.id || 0) - Number(a.id || 0);
   });
+
+  const filteredProducts = products
+    .filter((product) => {
+      const haystack = `${product.name} ${product.description || ""}`.toLowerCase();
+      const matchesSearch = haystack.includes(normalizedProductSearchQuery);
+      const matchesCategory =
+        selectedCategory === "all" || product.category === selectedCategory;
+      const matchesAvailability =
+        selectedAvailability === "all" ||
+        (selectedAvailability === "available" && product.is_available) ||
+        (selectedAvailability === "out-of-stock" && !product.is_available);
+
+      return matchesSearch && matchesCategory && matchesAvailability;
+    })
+    .sort((a, b) => {
+      if (sortBy === "price-low") {
+        return Number(a.price) - Number(b.price);
+      }
+
+      if (sortBy === "price-high") {
+        return Number(b.price) - Number(a.price);
+      }
+
+      if (sortBy === "category") {
+        return (
+          a.category.localeCompare(b.category) ||
+          a.name.localeCompare(b.name) ||
+          a.id - b.id
+        );
+      }
+
+      if (sortBy === "name-desc") {
+        return b.name.localeCompare(a.name);
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+
+  const productsByCategory = PRODUCT_CATEGORIES.map((category) => ({
+    category,
+    count: products.filter((product) => product.category === category).length,
+  })).filter((item) => item.count > 0);
 
   const groupedRevenueData = Object.values(
     sortedFilteredOrders.reduce((acc, order) => {
@@ -484,6 +821,50 @@ function App() {
     };
   });
 
+  const totalProducts = products.length;
+  const activeProducts = products.filter((product) => product.is_available).length;
+  const outOfStockProducts = products.filter((product) => !product.is_available).length;
+  const averageProductPrice =
+    totalProducts > 0
+      ? products.reduce((sum, product) => sum + Number(product.price), 0) /
+        totalProducts
+      : 0;
+
+  const productKpis = [
+    {
+      icon: "TP",
+      label: "Total Products",
+      value: totalProducts,
+      badge: `${filteredProducts.length} visible`,
+      tone: "neutral",
+      description: "Live menu catalog items in the protected products table.",
+    },
+    {
+      icon: "AC",
+      label: "Active Items",
+      value: activeProducts,
+      badge: `${totalProducts ? Math.round((activeProducts / totalProducts) * 100) : 0}% live`,
+      tone: "success",
+      description: "Currently available for service and ordering.",
+    },
+    {
+      icon: "OS",
+      label: "Out of Stock",
+      value: outOfStockProducts,
+      badge: outOfStockProducts ? "Action required" : "Healthy stock",
+      tone: "warm",
+      description: "Items currently hidden from availability.",
+    },
+    {
+      icon: "AP",
+      label: "Average Price",
+      value: formatCurrency(averageProductPrice),
+      badge: `${PRODUCT_CATEGORIES.length} categories`,
+      tone: "info",
+      description: "Average menu price across the current catalog.",
+    },
+  ];
+
   const primaryKpis = [
     {
       icon: "RV",
@@ -491,15 +872,15 @@ function App() {
       value: formatCurrency(totalRevenue),
       badge: `${uniqueCustomers} guests`,
       tone: "warm",
-      description: "Revenue in the current view.",
+      description: "Revenue in the current filtered view.",
     },
     {
       icon: "OR",
       label: "Total Orders",
       value: totalOrders,
-      badge: hasActiveFilters ? "Filtered" : "Live",
+      badge: `${liveAttentionCount} active`,
       tone: "neutral",
-      description: "Protected orders in scope.",
+      description: "Protected orders currently in scope.",
     },
     {
       icon: "AV",
@@ -507,7 +888,7 @@ function App() {
       value: formatCurrency(averageOrder),
       badge: `${uniqueCustomers || 0} customers`,
       tone: "info",
-      description: "Average ticket value.",
+      description: "Average ticket value across visible orders.",
     },
     {
       icon: "CM",
@@ -515,7 +896,7 @@ function App() {
       value: completedOrders,
       badge: `${completionRate}% closed`,
       tone: "success",
-      description: "Closed by the kitchen team.",
+      description: "Orders completed successfully by the kitchen team.",
     },
   ];
 
@@ -532,9 +913,7 @@ function App() {
       icon: "PR",
       label: "Preparing Orders",
       value: preparingOrders,
-      badge: totalOrders
-        ? `${Math.round((preparingOrders / totalOrders) * 100)}%`
-        : "0%",
+      badge: totalOrders ? `${Math.round((preparingOrders / totalOrders) * 100)}%` : "0%",
       tone: "info",
       description: "In active preparation.",
     },
@@ -542,17 +921,17 @@ function App() {
       icon: "CU",
       label: "Active Customers",
       value: uniqueCustomers,
-      badge: topCustomer ? "Top guest live" : "Awaiting data",
+      badge: topCustomer ? topCustomer.name : "Awaiting orders",
       tone: "neutral",
-      description: "Unique customers in view.",
+      description: "Unique customers in the current order view.",
     },
     {
       icon: "MX",
       label: "Highest Order",
       value: formatCurrency(highestOrderValue),
-      badge: topCustomer ? topCustomer.name : "No leader yet",
+      badge: topCustomer ? "Top customer live" : "No leader yet",
       tone: "success",
-      description: "Highest order in scope.",
+      description: "Highest order in the visible dataset.",
     },
   ];
 
@@ -561,9 +940,9 @@ function App() {
       icon: "CU",
       label: "Unique Customers",
       value: uniqueCustomers,
-      badge: hasActiveFilters ? "Filtered view" : "Live base",
+      badge: `${topCustomers.length} ranked`,
       tone: "neutral",
-      description: "Customers derived from protected orders.",
+      description: "Customers derived directly from the protected order history.",
     },
     {
       icon: "TP",
@@ -571,7 +950,7 @@ function App() {
       value: topCustomer ? formatCurrency(topCustomer.total) : formatCurrency(0),
       badge: topCustomer ? topCustomer.name : "No customer yet",
       tone: "warm",
-      description: "Highest customer revenue contribution.",
+      description: "Highest revenue contribution in the current order view.",
     },
     {
       icon: "AV",
@@ -579,7 +958,7 @@ function App() {
       value: formatCurrency(averageCustomerRevenue),
       badge: repeatLeader ? repeatLeader.name : "No repeat guest",
       tone: "info",
-      description: "Revenue per customer in the current view.",
+      description: "Revenue per customer in the current filtered view.",
     },
     {
       icon: "RT",
@@ -587,12 +966,50 @@ function App() {
       value: repeatLeader ? repeatLeader.totalOrders : 0,
       badge: repeatLeader ? repeatLeader.name : "No visits yet",
       tone: "success",
-      description: "Highest order count among current customers.",
+      description: "Highest order count among visible customers.",
     },
   ];
 
-  const handleExportSnapshot = () => {
-    if (sortedFilteredOrders.length === 0) return;
+  const productImageOptions =
+    products
+      .filter((product) => product.image_url)
+      .reduce((acc, product) => {
+        if (!acc.some((option) => option.value === product.image_url)) {
+          acc.push({
+            value: product.image_url,
+            label: `${product.name} (${product.category})`,
+          });
+        }
+
+        return acc;
+      }, []) || [];
+
+  if (productImageOptions.length === 0) {
+    productImageOptions.push({
+      value: getFallbackProductImage(),
+      label: "Smokehouse Royale Burger (Burgers)",
+    });
+  }
+
+  const imageOptionsForForm = [...productImageOptions].sort((a, b) =>
+    a.label.localeCompare(b.label)
+  );
+
+  const displayUser = currentUser || {
+    name: "Restaurant Manager",
+    email: "manager@dashboard.local",
+  };
+  const currentPage = PAGE_META[activePage];
+
+  const isWorking =
+    isSavingOrder ||
+    isSavingProduct ||
+    deletingOrderId !== null ||
+    deletingProductId !== null ||
+    togglingProductId !== null;
+
+  const handleExportOrders = () => {
+    if (!sortedFilteredOrders.length) return;
 
     const header = ["Order ID", "Customer", "Status", "Amount", "Created At"];
     const rows = sortedFilteredOrders.map((order) => [
@@ -616,14 +1033,38 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
-  const isBusy = isSavingOrder || deletingOrderId !== null;
-  const displayUser = currentUser || {
-    name: "Restaurant Manager",
-    email: "manager@dashboard.local",
-  };
-  const currentPage = PAGE_META[activePage];
+  const handleExportMenu = () => {
+    if (!filteredProducts.length) return;
 
-  const renderFiltersPanel = (description) => (
+    const header = [
+      "Product",
+      "Category",
+      "Availability",
+      "Price",
+      "Description",
+      "Image URL",
+    ];
+    const rows = filteredProducts.map((product) => [
+      `"${String(product.name).replace(/"/g, '""')}"`,
+      `"${String(product.category).replace(/"/g, '""')}"`,
+      formatProductAvailability(product.is_available),
+      Number(product.price).toFixed(2),
+      `"${String(product.description || "").replace(/"/g, '""')}"`,
+      product.image_url || "",
+    ]);
+
+    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `restaurant-menu-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const renderOrdersFiltersPanel = (description) => (
     <section className="filters-panel">
       <div>
         <h2>Search & Filters</h2>
@@ -635,7 +1076,7 @@ function App() {
           <span>Status</span>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(event) => setStatusFilter(event.target.value)}
           >
             <option value="all">All Statuses</option>
             {ORDER_STATUSES.map((status) => (
@@ -649,8 +1090,8 @@ function App() {
         <button
           type="button"
           className="secondary-button"
-          onClick={clearFilters}
-          disabled={!hasActiveFilters}
+          onClick={clearOrderFilters}
+          disabled={normalizedOrdersSearchQuery === "" && statusFilter === "all"}
         >
           Clear Filters
         </button>
@@ -658,7 +1099,7 @@ function App() {
 
       <div className="active-filters">
         <span className="filter-chip">
-          Search: {searchTerm.trim() ? searchTerm.trim() : "All customers"}
+          Search: {ordersSearchQuery.trim() ? ordersSearchQuery.trim() : "All customers"}
         </span>
         <span className="filter-chip">
           Status:{" "}
@@ -670,7 +1111,91 @@ function App() {
     </section>
   );
 
+  const renderProductsFiltersPanel = () => (
+    <section className="products-filters-panel">
+      <div className="products-inline-search">
+        <span className="topbar-search-icon">Search</span>
+        <input
+          type="search"
+          placeholder="Search menu items..."
+          value={productSearchQuery}
+          onChange={(event) => setProductSearchQuery(event.target.value)}
+        />
+      </div>
+
+      <div className="products-toolbar">
+        <label className="filter-field">
+          <span>Category</span>
+          <select
+            value={selectedCategory}
+            onChange={(event) => setSelectedCategory(event.target.value)}
+          >
+            <option value="all">All Categories</option>
+            {PRODUCT_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="filter-field">
+          <span>Availability</span>
+          <select
+            value={selectedAvailability}
+            onChange={(event) => setSelectedAvailability(event.target.value)}
+          >
+            <option value="all">All Status</option>
+            <option value="available">Available</option>
+            <option value="out-of-stock">Out of Stock</option>
+          </select>
+        </label>
+
+        <label className="filter-field">
+          <span>Sort</span>
+          <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+            <option value="name-asc">Name A-Z</option>
+            <option value="name-desc">Name Z-A</option>
+            <option value="price-low">Price Low-High</option>
+            <option value="price-high">Price High-Low</option>
+            <option value="category">Category</option>
+          </select>
+        </label>
+
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={clearProductFilters}
+          disabled={
+            normalizedProductSearchQuery === "" &&
+            selectedCategory === "all" &&
+            selectedAvailability === "all" &&
+            sortBy === "name-asc"
+          }
+        >
+          Clear Filters
+        </button>
+      </div>
+    </section>
+  );
+
   const renderPageHeroAside = () => {
+    if (activePage === "products") {
+      return (
+        <div className="overview-note-card">
+          <span className="note-label">Menu snapshot</span>
+          <strong>
+            {filteredProducts.length} visible items across {productsByCategory.length} live
+            categories
+          </strong>
+          <small>
+            Use the full menu grid below to edit, remove, or toggle availability
+            without leaving the dashboard.
+          </small>
+        </div>
+      );
+    }
+
     if (activePage === "orders") {
       return (
         <div className="overview-note-card">
@@ -727,250 +1252,73 @@ function App() {
           <span className="note-label">Workspace status</span>
           <strong>Local Docker profile ready</strong>
           <small>
-            Frontend 5173, backend 3001, PostgreSQL 5432. Auth and CSV export
-            remain active.
+            Frontend 5173, backend 3001, PostgreSQL 5432. Auth and exports remain
+            active.
           </small>
         </div>
       );
     }
 
-    return null;
+    return (
+      <div className="overview-note-card">
+        <span className="note-label">Live kitchen queue</span>
+        <strong>{liveAttentionCount} orders need attention</strong>
+        <small>
+          Pending and preparing orders update in real time from your protected
+          account data.
+        </small>
+      </div>
+    );
   };
 
   const renderPageHero = () => {
-    const heroAside = renderPageHeroAside();
+    const isProductsPage = activePage === "products";
 
     return (
-      <section className={`overview-hero page-hero page-${activePage}-hero`}>
+      <section className={`overview-hero page-${activePage}-hero`}>
         <div className="page-hero-copy">
-          <span className="hero-eyebrow">{currentPage.eyebrow || currentPage.title}</span>
+          <span className="hero-eyebrow">{currentPage.eyebrow}</span>
           <h1>{currentPage.title}</h1>
           <p>{currentPage.subtitle}</p>
         </div>
 
-        <div className="overview-actions page-hero-aside">
+        <div className="overview-actions">
           <div className="hero-actions-bar">
             <button
               type="button"
               className="secondary-button hero-action-button"
-              onClick={handleExportSnapshot}
-              disabled={!sortedFilteredOrders.length}
+              onClick={isProductsPage ? handleExportMenu : handleExportOrders}
+              disabled={isProductsPage ? filteredProducts.length === 0 : sortedFilteredOrders.length === 0}
             >
-              Export Snapshot
+              {isProductsPage ? "Export Menu" : "Export Snapshot"}
             </button>
 
             <button
               type="button"
               className="primary-button hero-action-button"
-              onClick={activePage === "settings" ? () => setActivePage("orders") : openCreateOrder}
+              onClick={
+                isProductsPage
+                  ? openCreateProduct
+                  : activePage === "settings"
+                    ? () => setActivePage("orders")
+                    : openCreateOrder
+              }
             >
-              {activePage === "settings" ? "Open Orders" : "Add Order"}
+              {isProductsPage
+                ? "Add Product"
+                : activePage === "settings"
+                  ? "Open Orders"
+                  : "New Order"}
             </button>
           </div>
 
-          {heroAside}
+          {renderPageHeroAside()}
         </div>
       </section>
     );
   };
 
   const renderOverviewPage = () => (
-    <>
-      {renderPageHero()}
-
-      <section className="kpi-grid">
-        {primaryKpis.map((card) => (
-          <KpiCard key={card.label} {...card} />
-        ))}
-      </section>
-
-      <section className="secondary-kpi-grid">
-        {secondaryKpis.map((card) => (
-          <KpiCard key={card.label} compact {...card} />
-        ))}
-      </section>
-
-      {renderFiltersPanel(
-        "Topbar search and status filters update the service snapshot, KPI cards, chart, and recent order summary."
-      )}
-
-      <section className="dashboard-grid">
-        <div className="dashboard-column-left">
-          <div className="panel-card">
-            <div className="panel-header">
-              <div>
-                <h2>Revenue Performance</h2>
-                <p>
-                  Grouped customer revenue using live order data from the current
-                  account.
-                </p>
-              </div>
-              <span className="panel-chip">Revenue by customer</span>
-            </div>
-
-            <AnalyticsChart
-              data={groupedRevenueData}
-              isLoading={isOrdersLoading}
-              hasActiveFilters={hasActiveFilters}
-              formatCurrency={formatCurrency}
-              formatAxisCurrency={formatAxisCurrency}
-            />
-          </div>
-        </div>
-
-        <div className="dashboard-column-right">
-          <div className="widget-card premium-card">
-            <div className="widget-header">
-              <span className="widget-icon">INV</span>
-              <span className="widget-chip">Premium</span>
-            </div>
-            <h3>Smart Inventory</h3>
-            <p>
-              Inventory forecasting is ready for the next phase. Right now,
-              <strong> {liveAttentionCount}</strong> live orders are shaping
-              kitchen demand.
-            </p>
-            <div className="widget-metrics">
-              <div>
-                <span>Pending</span>
-                <strong>{pendingOrders}</strong>
-              </div>
-              <div>
-                <span>Preparing</span>
-                <strong>{preparingOrders}</strong>
-              </div>
-            </div>
-          </div>
-
-          <div className="widget-card">
-            <div className="widget-header">
-              <span className="widget-icon">TOP</span>
-              <span className="widget-chip">Favorites</span>
-            </div>
-            <h3>Signature Favorites</h3>
-            <p>
-              Top customers ranked by revenue contribution in the current filtered
-              view.
-            </p>
-            <div className="mini-list">
-              {topCustomers.length === 0 ? (
-                <p className="mini-empty">No customer revenue data available.</p>
-              ) : (
-                topCustomers.slice(0, 3).map((customer) => (
-                  <div className="mini-list-row" key={customer.name}>
-                    <span>{customer.name}</span>
-                    <strong>{formatCurrency(customer.totalRevenue)}</strong>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="widget-card">
-            <div className="widget-header">
-              <span className="widget-icon">ACT</span>
-              <span className="widget-chip info">Activity</span>
-            </div>
-            <h3>Customer Feedback</h3>
-            <p>
-              Recent account activity built from real protected orders while richer
-              feedback modules remain a future upgrade.
-            </p>
-            <div className="activity-list">
-              {recentOrders.length === 0 ? (
-                <p className="mini-empty">No recent order activity yet.</p>
-              ) : (
-                recentOrders.slice(0, 3).map((order) => (
-                  <div className="activity-row" key={order.id}>
-                    <div>
-                      <strong>{getCustomerLabel(order.customer_name)}</strong>
-                      <small>{formatDate(order.created_at)}</small>
-                    </div>
-                    <span
-                      className={`status-badge status-${getOrderStatus(
-                        order.status
-                      )}`}
-                    >
-                      {STATUS_LABELS[getOrderStatus(order.status)]}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="summary-grid">
-        <div className="panel-card">
-          <div className="panel-header">
-            <div>
-              <h2>Recent Orders</h2>
-              <p>Latest protected orders from the current filtered service view.</p>
-            </div>
-            <span className="panel-chip">
-              {recentOrders.length} of {totalOrders}
-            </span>
-          </div>
-
-          {recentOrders.length === 0 ? (
-            <p className="status-message">
-              {hasActiveFilters
-                ? "No recent orders match the current filters."
-                : "No orders yet. Add an order to reveal recent activity."}
-            </p>
-          ) : (
-            <div className="summary-list">
-              {recentOrders.map((order) => (
-                <div className="summary-row" key={order.id}>
-                  <div className="summary-row-meta">
-                    <strong>{getCustomerLabel(order.customer_name)}</strong>
-                    <span>
-                      #{order.id} · {formatDate(order.created_at)}
-                    </span>
-                  </div>
-                  <div className="summary-row-end">
-                    <strong>{formatCurrency(order.total_price)}</strong>
-                    <span
-                      className={`status-badge status-${getOrderStatus(
-                        order.status
-                      )}`}
-                    >
-                      {STATUS_LABELS[getOrderStatus(order.status)]}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="panel-card">
-          <div className="panel-header">
-            <div>
-              <h2>Service Snapshot</h2>
-              <p>Status distribution for the same live order set.</p>
-            </div>
-            <span className="panel-chip">Kitchen mix</span>
-          </div>
-
-          <div className="metric-list">
-            {statusBreakdown.map((status) => (
-              <div className="metric-row" key={status.value}>
-                <div>
-                  <strong>{status.label}</strong>
-                  <small>{status.percentage}% of active view</small>
-                </div>
-                <span>{status.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-    </>
-  );
-
-  const renderPremiumOverviewPage = () => (
     <>
       {renderPageHero()}
 
@@ -991,26 +1339,15 @@ function App() {
                   the current dashboard view.
                 </p>
               </div>
-              <div className="panel-tabs">
-                {OVERVIEW_CHART_RANGES.map((range) => (
-                  <button
-                    key={range.value}
-                    type="button"
-                    className={`panel-tab ${
-                      overviewChartRange === range.value ? "active" : ""
-                    }`}
-                    onClick={() => setOverviewChartRange(range.value)}
-                  >
-                    {range.label}
-                  </button>
-                ))}
-              </div>
+              <span className="panel-chip">Revenue by customer</span>
             </div>
 
             <AnalyticsChart
               data={groupedRevenueData}
               isLoading={isOrdersLoading}
-              hasActiveFilters={hasActiveFilters}
+              hasActiveFilters={
+                normalizedOrdersSearchQuery !== "" || statusFilter !== "all"
+              }
               formatCurrency={formatCurrency}
               formatAxisCurrency={formatAxisCurrency}
             />
@@ -1020,23 +1357,17 @@ function App() {
         <div className="dashboard-column-right">
           <div className="widget-card popular-panel">
             <div className="widget-header">
-              <span className="widget-icon">POP</span>
-              <span className="widget-chip">
-                {OVERVIEW_CHART_RANGES.find(
-                  (range) => range.value === overviewChartRange
-                )?.label || "Live"}
-              </span>
+              <span className="widget-icon">TOP</span>
+              <span className="widget-chip">Customers</span>
             </div>
             <h3>Popular Customers</h3>
-            <p>
-              Highest-value guests from the current filtered revenue snapshot.
-            </p>
+            <p>Highest-value guests from the current filtered revenue snapshot.</p>
 
             <div className="popular-list">
               {topCustomers.length === 0 ? (
                 <p className="mini-empty">No customer revenue data available.</p>
               ) : (
-                topCustomers.slice(0, 3).map((customer) => (
+                topCustomers.slice(0, 4).map((customer) => (
                   <div className="popular-list-row" key={customer.name}>
                     <div className="popular-list-user">
                       <span className="popular-list-avatar">
@@ -1070,60 +1401,85 @@ function App() {
       </section>
 
       <section className="panel-card recent-orders-panel">
-          <div className="panel-header">
-            <div>
-              <h2>Recent Orders</h2>
-              <p>Latest protected orders from the current filtered service view.</p>
-            </div>
-            <div className="panel-inline-actions">
-              <button
-                type="button"
-                className="table-toolbar-button"
-                onClick={() => setActivePage("orders")}
-              >
-                View All
-              </button>
-              <button
-                type="button"
-                className="table-toolbar-button"
-                onClick={handleExportSnapshot}
-                disabled={!sortedFilteredOrders.length}
-              >
-                Export
-              </button>
-            </div>
+        <div className="panel-header">
+          <div>
+            <h2>Recent Orders</h2>
+            <p>Latest protected orders from the current filtered service view.</p>
           </div>
+          <div className="panel-inline-actions">
+            <button
+              type="button"
+              className="table-toolbar-button"
+              onClick={() => setActivePage("orders")}
+            >
+              View All
+            </button>
+            <button
+              type="button"
+              className="table-toolbar-button"
+              onClick={handleExportOrders}
+              disabled={!sortedFilteredOrders.length}
+            >
+              Export
+            </button>
+          </div>
+        </div>
 
         <OrdersTable
           orders={recentOrders}
           totalOrders={orders.length}
-          hasActiveFilters={hasActiveFilters}
+          hasActiveFilters={
+            normalizedOrdersSearchQuery !== "" || statusFilter !== "all"
+          }
           editingOrderId={editingOrderId}
           deletingOrderId={deletingOrderId}
-          isBusy={isBusy}
+          isBusy={isWorking}
           isLoading={isOrdersLoading}
           onEdit={handleEditOrder}
-          onDelete={handleDeleteOrder}
+          onDelete={requestDeleteOrder}
           formatCurrency={formatCurrency}
           formatDate={formatDate}
           getOrderStatus={getOrderStatus}
           statusLabels={STATUS_LABELS}
         />
-
-        <div className="table-footer">
-          <span>
-            Showing {recentOrders.length} of {totalOrders} orders
-          </span>
-          <div className="table-pagination">
-            <button type="button" className="active">
-              1
-            </button>
-            <button type="button" onClick={() => setActivePage("orders")}>
-              All
-            </button>
-          </div>
-        </div>
       </section>
+    </>
+  );
+
+  const renderProductsPage = () => (
+    <>
+      {renderPageHero()}
+
+      <section className="kpi-grid">
+        {productKpis.map((card) => (
+          <KpiCard key={card.label} {...card} />
+        ))}
+      </section>
+
+      {renderProductsFiltersPanel()}
+
+      {productsError && products.length > 0 && (
+        <p className="status-message error">{productsError}</p>
+      )}
+
+      <ProductsGrid
+        products={filteredProducts}
+        isLoading={isProductsLoading}
+        error={productsError}
+        hasFilters={
+          normalizedProductSearchQuery !== "" ||
+          selectedCategory !== "all" ||
+          selectedAvailability !== "all" ||
+          sortBy !== "name-asc"
+        }
+        onRetry={fetchProducts}
+        onEdit={openEditProduct}
+        onDelete={requestDeleteProduct}
+        onToggle={handleToggleProduct}
+        deletingProductId={deletingProductId}
+        togglingProductId={togglingProductId}
+        formatCurrency={formatCurrency}
+      />
     </>
   );
 
@@ -1131,7 +1487,7 @@ function App() {
     <>
       {renderPageHero()}
 
-      {renderFiltersPanel(
+      {renderOrdersFiltersPanel(
         "Filter by customer name from the topbar and narrow the order queue by service status."
       )}
 
@@ -1146,7 +1502,7 @@ function App() {
               </p>
             </div>
             <span className="panel-chip">
-              {hasActiveFilters
+              {normalizedOrdersSearchQuery !== "" || statusFilter !== "all"
                 ? `${sortedFilteredOrders.length} matching`
                 : `${orders.length} total`}
             </span>
@@ -1155,13 +1511,15 @@ function App() {
           <OrdersTable
             orders={sortedFilteredOrders}
             totalOrders={orders.length}
-            hasActiveFilters={hasActiveFilters}
+            hasActiveFilters={
+              normalizedOrdersSearchQuery !== "" || statusFilter !== "all"
+            }
             editingOrderId={editingOrderId}
             deletingOrderId={deletingOrderId}
-            isBusy={isBusy}
+            isBusy={isWorking}
             isLoading={isOrdersLoading}
             onEdit={handleEditOrder}
-            onDelete={handleDeleteOrder}
+            onDelete={requestDeleteOrder}
             formatCurrency={formatCurrency}
             formatDate={formatDate}
             getOrderStatus={getOrderStatus}
@@ -1179,7 +1537,7 @@ function App() {
             onTotalPriceChange={setTotalPrice}
             onOrderStatusChange={setOrderStatus}
             onSubmit={handleSubmitOrder}
-            onCancel={resetForm}
+            onCancel={resetOrderForm}
             isSavingOrder={isSavingOrder}
             orderStatuses={ORDER_STATUSES}
           />
@@ -1204,7 +1562,7 @@ function App() {
         ))}
       </section>
 
-      {renderFiltersPanel(
+      {renderOrdersFiltersPanel(
         "Analytics update from the same filtered protected orders, so every KPI and chart stays consistent."
       )}
 
@@ -1225,7 +1583,9 @@ function App() {
             <AnalyticsChart
               data={groupedRevenueData}
               isLoading={isOrdersLoading}
-              hasActiveFilters={hasActiveFilters}
+              hasActiveFilters={
+                normalizedOrdersSearchQuery !== "" || statusFilter !== "all"
+              }
               formatCurrency={formatCurrency}
               formatAxisCurrency={formatAxisCurrency}
             />
@@ -1315,7 +1675,7 @@ function App() {
         ))}
       </section>
 
-      {renderFiltersPanel(
+      {renderOrdersFiltersPanel(
         "Customer rollups react to the current search term and status filter so the list stays aligned with active orders."
       )}
 
@@ -1330,7 +1690,7 @@ function App() {
 
         {customersData.length === 0 ? (
           <p className="status-message">
-            {hasActiveFilters
+            {normalizedOrdersSearchQuery !== "" || statusFilter !== "all"
               ? "No customers match the active search and status filters."
               : "No customer data yet. Add orders to reveal customer insights."}
           </p>
@@ -1394,8 +1754,8 @@ function App() {
               <strong>{orders.length}</strong>
             </div>
             <div className="detail-row">
-              <span>Current View</span>
-              <strong>{PAGE_META[activePage].title}</strong>
+              <span>Visible Products</span>
+              <strong>{products.length}</strong>
             </div>
           </div>
 
@@ -1403,7 +1763,7 @@ function App() {
             type="button"
             className="logout-button settings-logout"
             onClick={handleLogout}
-            disabled={isBusy}
+            disabled={isWorking}
           >
             Logout
           </button>
@@ -1465,12 +1825,12 @@ function App() {
               <strong>5432</strong>
             </div>
             <div className="detail-row">
-              <span>Deployment Mode</span>
-              <strong>Local Docker Compose</strong>
+              <span>Deployment</span>
+              <strong>Render + Vercel</strong>
             </div>
             <div className="detail-row">
               <span>Data Scope</span>
-              <strong>User-specific orders only</strong>
+              <strong>Protected orders + menu catalog</strong>
             </div>
           </div>
         </div>
@@ -1479,23 +1839,13 @@ function App() {
   );
 
   const renderActivePage = () => {
-    if (activePage === "orders") {
-      return renderOrdersPage();
-    }
+    if (activePage === "products") return renderProductsPage();
+    if (activePage === "orders") return renderOrdersPage();
+    if (activePage === "analytics") return renderAnalyticsPage();
+    if (activePage === "customers") return renderCustomersPage();
+    if (activePage === "settings") return renderSettingsPage();
 
-    if (activePage === "analytics") {
-      return renderAnalyticsPage();
-    }
-
-    if (activePage === "customers") {
-      return renderCustomersPage();
-    }
-
-    if (activePage === "settings") {
-      return renderSettingsPage();
-    }
-
-    return renderPremiumOverviewPage();
+    return renderOverviewPage();
   };
 
   if (!token) {
@@ -1514,8 +1864,8 @@ function App() {
             <div className="auth-brand-copy">
               <h2>Manage your restaurant operations with confidence</h2>
               <p>
-                Track live orders, monitor revenue, and keep the service floor aligned
-                from one protected workspace.
+                Track live orders, control the menu, monitor revenue, and keep
+                the service floor aligned from one protected workspace.
               </p>
             </div>
 
@@ -1526,7 +1876,10 @@ function App() {
                 <span>+2K</span>
               </div>
               <strong>Trusted by ambitious dining teams.</strong>
-              <p>Daily order flow, customer history, and analytics in one calm dashboard.</p>
+              <p>
+                Daily order flow, customer history, and menu control in one calm
+                dashboard.
+              </p>
             </div>
           </div>
 
@@ -1543,8 +1896,8 @@ function App() {
               <h1>{isRegister ? "Create your account" : "Welcome Back"}</h1>
               <p>
                 {isRegister
-                  ? "Create your account to start managing service, revenue, and guest flow."
-                  : "Login to access your executive restaurant workspace."}
+                  ? "Create your account to start managing service, menu items, and guest flow."
+                  : "Login to access your premium restaurant workspace."}
               </p>
             </div>
 
@@ -1556,7 +1909,7 @@ function App() {
                     type="text"
                     value={name}
                     placeholder="Your full name"
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(event) => setName(event.target.value)}
                     disabled={isAuthLoading}
                     required
                   />
@@ -1569,7 +1922,7 @@ function App() {
                   type="email"
                   value={email}
                   placeholder="chef@restodash.com"
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(event) => setEmail(event.target.value)}
                   disabled={isAuthLoading}
                   required
                 />
@@ -1581,7 +1934,7 @@ function App() {
                   type="password"
                   value={password}
                   placeholder="Enter your password"
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(event) => setPassword(event.target.value)}
                   disabled={isAuthLoading}
                   required
                 />
@@ -1610,7 +1963,7 @@ function App() {
             <button
               type="button"
               className="auth-switch"
-              onClick={() => !isAuthLoading && setIsRegister(!isRegister)}
+              onClick={() => !isAuthLoading && setIsRegister((value) => !value)}
               disabled={isAuthLoading}
             >
               {isRegister
@@ -1619,7 +1972,8 @@ function App() {
             </button>
 
             <p className="auth-security-note">
-              Enterprise-grade session security, JWT authentication, and protected order access.
+              Enterprise-grade session security, JWT authentication, and protected
+              access to orders and menu operations.
             </p>
           </section>
         </section>
@@ -1628,56 +1982,89 @@ function App() {
   }
 
   return (
-    <div
-      className={`dashboard-shell ${isMobileSidebarOpen ? "mobile-nav-open" : ""}`}
-    >
-      <Sidebar
-        currentUser={displayUser}
-        activePage={activePage}
-        onPageChange={setActivePage}
-        isMobileOpen={isMobileSidebarOpen}
-        onClose={() => setIsMobileSidebarOpen(false)}
-        onCreateOrder={openCreateOrder}
-        onLogout={handleLogout}
+    <>
+      <div className={`dashboard-shell ${isMobileSidebarOpen ? "mobile-nav-open" : ""}`}>
+        <Sidebar
+          currentUser={displayUser}
+          activePage={activePage}
+          onPageChange={setActivePage}
+          isMobileOpen={isMobileSidebarOpen}
+          onClose={() => setIsMobileSidebarOpen(false)}
+          primaryActionLabel={activePage === "products" ? "Add Product" : "New Order"}
+          onPrimaryAction={activePage === "products" ? openCreateProduct : openCreateOrder}
+          onLogout={handleLogout}
+        />
+
+        <button
+          type="button"
+          className={`sidebar-backdrop ${isMobileSidebarOpen ? "visible" : ""}`}
+          aria-label="Close navigation"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+
+        <main className="dashboard-main">
+          <div className={`dashboard-content page-${activePage}`}>
+            <Topbar
+              currentUser={displayUser}
+              pageTitle={currentPage.navTitle}
+              searchTerm={
+                activePage === "products" ? productSearchQuery : ordersSearchQuery
+              }
+              onSearchChange={
+                activePage === "products"
+                  ? setProductSearchQuery
+                  : setOrdersSearchQuery
+              }
+              onLogout={handleLogout}
+              notificationCount={liveAttentionCount + outOfStockProducts}
+              isBusy={isWorking}
+              onToggleSidebar={() =>
+                setIsMobileSidebarOpen((currentValue) => !currentValue)
+              }
+              isMobileSidebarOpen={isMobileSidebarOpen}
+            />
+
+            {ordersError && activePage !== "products" && (
+              <p className="status-message error">{ordersError}</p>
+            )}
+
+            {renderActivePage()}
+          </div>
+        </main>
+
+        <BottomNav
+          activePage={activePage}
+          onPageChange={setActivePage}
+          onPrimaryAction={activePage === "products" ? openCreateProduct : openCreateOrder}
+        />
+      </div>
+
+      <ProductModal
+        isOpen={productFormOpen}
+        isSaving={isSavingProduct}
+        productForm={productForm}
+        categories={PRODUCT_CATEGORIES}
+        imageOptions={imageOptionsForForm}
+        onClose={() => {
+          if (!isSavingProduct) {
+            setProductFormOpen(false);
+            setEditingProduct(null);
+          }
+        }}
+        onChange={handleProductFormChange}
+        onSubmit={handleSubmitProduct}
+        isEditing={Boolean(editingProduct)}
       />
 
-      <button
-        type="button"
-        className={`sidebar-backdrop ${isMobileSidebarOpen ? "visible" : ""}`}
-        aria-label="Close navigation"
-        onClick={() => setIsMobileSidebarOpen(false)}
+      <ConfirmDialog
+        config={confirmDialog}
+        isBusy={Boolean(deletingOrderId || deletingProductId)}
+        onCancel={() => setConfirmDialog(null)}
+        onConfirm={handleConfirmDialog}
       />
 
-      <main className="dashboard-main">
-        <div className={`dashboard-content page-${activePage}`}>
-          <Topbar
-            currentUser={displayUser}
-            pageTitle={currentPage.navTitle || currentPage.title}
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            onExport={handleExportSnapshot}
-            onLogout={handleLogout}
-            notificationCount={liveAttentionCount}
-            isBusy={isBusy}
-            canExport={sortedFilteredOrders.length > 0}
-            onToggleSidebar={() =>
-              setIsMobileSidebarOpen((currentValue) => !currentValue)
-            }
-            isMobileSidebarOpen={isMobileSidebarOpen}
-          />
-
-          {ordersError && <p className="status-message error">{ordersError}</p>}
-
-          {renderActivePage()}
-        </div>
-      </main>
-
-      <BottomNav
-        activePage={activePage}
-        onPageChange={setActivePage}
-        onCreateOrder={openCreateOrder}
-      />
-    </div>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+    </>
   );
 }
 

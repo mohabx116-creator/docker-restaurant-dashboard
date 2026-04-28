@@ -1,19 +1,19 @@
 const NAV_ITEMS = [
   { id: "overview", label: "Home", short: "HM" },
+  { id: "products", label: "Menu", short: "MN" },
   { id: "orders", label: "Orders", short: "OR" },
   { id: "analytics", label: "Analytics", short: "AN" },
-  { id: "customers", label: "Customers", short: "CU" },
   { id: "settings", label: "Settings", short: "ST" },
 ];
 
-function BottomNav({ activePage, onPageChange, onCreateOrder }) {
+function BottomNav({ activePage, onPageChange, onPrimaryAction }) {
   return (
     <>
       <button
         type="button"
         className="floating-order-button"
-        aria-label="Create order"
-        onClick={onCreateOrder}
+        aria-label="Create item"
+        onClick={onPrimaryAction}
       >
         +
       </button>

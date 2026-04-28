@@ -7,3 +7,4 @@ backend/node_modules
 frontend/dist
 backend/.env
 docker-restaurant-dashboard_postgres_data
+.codex-temp/
