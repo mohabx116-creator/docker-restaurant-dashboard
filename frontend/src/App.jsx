@@ -130,6 +130,7 @@ function App() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("mohab@test.com");
   const [password, setPassword] = useState("123456");
+  const [showPassword, setShowPassword] = useState(false);
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [currentUser, setCurrentUser] = useState(parseStoredUser);
   const [activePage, setActivePage] = useState("overview");
@@ -1854,38 +1855,39 @@ function App() {
         <section className="auth-shell">
           <div className="auth-brand-panel">
             <div className="auth-brand">
-              <div className="brand-mark">RD</div>
+              <div className="brand-mark auth-brand-mark" aria-hidden="true">
+                <span />
+              </div>
               <div>
                 <strong>RestoDash Lite</strong>
-                <span>Executive Restaurant SaaS</span>
               </div>
             </div>
 
             <div className="auth-brand-copy">
-              <h2>Manage your restaurant operations with confidence</h2>
+              <h2>Master your kitchen&apos;s rhythm with surgical precision.</h2>
               <p>
-                Track live orders, control the menu, monitor revenue, and keep
-                the service floor aligned from one protected workspace.
+                Elevate your operational excellence with real-time analytics and
+                seamless order management.
               </p>
             </div>
 
             <div className="auth-brand-metric">
               <div className="auth-brand-avatars">
-                <span>CH</span>
-                <span>OP</span>
+                <span className="avatar-photo avatar-one" />
+                <span className="avatar-photo avatar-two" />
                 <span>+2K</span>
               </div>
-              <strong>Trusted by ambitious dining teams.</strong>
-              <p>
-                Daily order flow, customer history, and menu control in one calm
-                dashboard.
-              </p>
+              <strong>
+                Join 2,000+ elite restaurateurs managing over 500k orders monthly.
+              </strong>
             </div>
           </div>
 
           <section className="auth-card">
             <div className="auth-mobile-brand">
-              <div className="brand-mark">RD</div>
+              <div className="brand-mark auth-brand-mark" aria-hidden="true">
+                <span />
+              </div>
               <div>
                 <strong>RestoDash Lite</strong>
                 <span>Dashboard Lite</span>
@@ -1897,7 +1899,7 @@ function App() {
               <p>
                 {isRegister
                   ? "Create your account to start managing service, menu items, and guest flow."
-                  : "Login to access your premium restaurant workspace."}
+                  : "Enter your credentials to access your executive dashboard."}
               </p>
             </div>
 
@@ -1917,27 +1919,60 @@ function App() {
               )}
 
               <label className="auth-field">
-                <span>Email</span>
-                <input
-                  type="email"
-                  value={email}
-                  placeholder="chef@restodash.com"
-                  onChange={(event) => setEmail(event.target.value)}
-                  disabled={isAuthLoading}
-                  required
-                />
+                <span>Email/Username</span>
+                <div className="auth-input-shell">
+                  <span className="auth-input-icon" aria-hidden="true">
+                    @
+                  </span>
+                  <input
+                    type="email"
+                    value={email}
+                    placeholder="chef@restodash.com"
+                    onChange={(event) => setEmail(event.target.value)}
+                    disabled={isAuthLoading}
+                    required
+                  />
+                </div>
               </label>
 
               <label className="auth-field">
-                <span>Password</span>
-                <input
-                  type="password"
-                  value={password}
-                  placeholder="Enter your password"
-                  onChange={(event) => setPassword(event.target.value)}
-                  disabled={isAuthLoading}
-                  required
-                />
+                <span className="auth-password-row">
+                  <span>Password</span>
+                  {!isRegister && (
+                    <button type="button" disabled={isAuthLoading}>
+                      Forgot Password?
+                    </button>
+                  )}
+                </span>
+                <div className="auth-input-shell">
+                  <span className="auth-input-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <path d="M7 10V8a5 5 0 0 1 10 0v2" />
+                      <rect width="14" height="10" x="5" y="10" rx="2" />
+                      <path d="M12 14v2" />
+                    </svg>
+                  </span>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    placeholder="Enter your password"
+                    onChange={(event) => setPassword(event.target.value)}
+                    disabled={isAuthLoading}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword((value) => !value)}
+                    disabled={isAuthLoading}
+                  >
+                    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </div>
               </label>
 
               <label className="auth-remember">
@@ -1950,15 +1985,35 @@ function App() {
                 disabled={isAuthLoading}
                 className="primary-button auth-submit"
               >
-                {isAuthLoading
+                <span>{isAuthLoading
                   ? isRegister
                     ? "Creating Account..."
                     : "Logging in..."
                   : isRegister
                     ? "Create Account"
-                    : "Login"}
+                    : "Login"}</span>
+                {!isAuthLoading && <span aria-hidden="true">-&gt;</span>}
               </button>
             </form>
+
+            {!isRegister && (
+              <>
+                <div className="auth-divider">
+                  <span>Or continue with</span>
+                </div>
+
+                <div className="auth-provider-row">
+                  <button type="button" disabled={isAuthLoading}>
+                    <span className="auth-provider-icon" aria-hidden="true">SS</span>
+                    SSO
+                  </button>
+                  <button type="button" disabled={isAuthLoading}>
+                    <span className="auth-provider-icon" aria-hidden="true">K</span>
+                    Auth0
+                  </button>
+                </div>
+              </>
+            )}
 
             <button
               type="button"
@@ -1967,13 +2022,21 @@ function App() {
               disabled={isAuthLoading}
             >
               {isRegister
-                ? "Already have an account? Login"
-                : "Do not have an account yet? Register"}
+                ? (
+                  <>
+                    Already have an account? <strong>Login</strong>
+                  </>
+                )
+                : (
+                  <>
+                    New to the platform? <strong>Create Account</strong>
+                  </>
+                )}
             </button>
 
             <p className="auth-security-note">
-              Enterprise-grade session security, JWT authentication, and protected
-              access to orders and menu operations.
+              <span aria-hidden="true">SEC</span>
+              Enterprise grade security &amp; 256-bit encryption
             </p>
           </section>
         </section>
