@@ -11,7 +11,6 @@ import ProductsGrid from "./components/ProductsGrid";
 import ProductModal from "./components/ProductModal";
 import ToastStack from "./components/ToastStack";
 import ConfirmDialog from "./components/ConfirmDialog";
-import CartDrawer from "./components/CartDrawer";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -47,6 +46,12 @@ const PAGE_META = {
     navTitle: "Products",
     eyebrow: "Menu management",
     subtitle: "Manage food items, pricing, categories, and availability.",
+  },
+  cart: {
+    title: "Order Cart",
+    navTitle: "Cart",
+    eyebrow: "Checkout workspace",
+    subtitle: "Review selected menu items, adjust quantities, and create a real order.",
   },
   orders: {
     title: "Orders",
@@ -313,7 +318,11 @@ function App() {
       ];
     });
 
-    setIsCartOpen(true);
+    addToast(
+      "Added to cart",
+      `${product.name} was added to the order cart.`,
+      "success"
+    );
   };
 
   const increaseCartItem = (productId) => {
@@ -1303,6 +1312,27 @@ function App() {
   );
 
   const renderPageHeroAside = () => {
+    if (activePage === "cart") {
+      const cartItemsCount = getCartItemsCount();
+      const cartTotal = cartItems.reduce(
+        (sum, item) => sum + Number(item.price) * item.quantity,
+        0
+      );
+
+      return (
+        <div className="overview-note-card">
+          <span className="note-label">Cart summary</span>
+          <strong>
+            {cartItemsCount} item{cartItemsCount === 1 ? "" : "s"} • {formatCurrency(cartTotal)}
+          </strong>
+          <small>
+            Quantities and pricing are reviewed here, while the backend validates
+            product availability and calculates the final secure total.
+          </small>
+        </div>
+      );
+    }
+
     if (activePage === "products") {
       return (
         <div className="overview-note-card">
@@ -1396,6 +1426,7 @@ function App() {
 
   const renderPageHero = () => {
     const isProductsPage = activePage === "products";
+    const isCartPage = activePage === "cart";
 
     return (
       <section className={`overview-hero page-${activePage}-hero`}>
@@ -1410,39 +1441,47 @@ function App() {
             <button
               type="button"
               className="secondary-button hero-action-button"
-              onClick={isProductsPage ? handleExportMenu : handleExportOrders}
-              disabled={isProductsPage ? filteredProducts.length === 0 : sortedFilteredOrders.length === 0}
+              onClick={
+                isCartPage
+                  ? () => setActivePage("products")
+                  : isProductsPage
+                    ? handleExportMenu
+                    : handleExportOrders
+              }
+              disabled={
+                isCartPage
+                  ? false
+                  : isProductsPage
+                    ? filteredProducts.length === 0
+                    : sortedFilteredOrders.length === 0
+              }
             >
-              {isProductsPage ? "Export Menu" : "Export Snapshot"}
+              {isCartPage ? "Browse Menu" : isProductsPage ? "Export Menu" : "Export Snapshot"}
             </button>
-
-            {isProductsPage && (
-              <button
-                type="button"
-                className="secondary-button hero-action-button"
-                onClick={() => setIsCartOpen(true)}
-                disabled={cartItems.length === 0}
-              >
-                Cart ({getCartItemsCount()})
-              </button>
-            )}
 
             <button
               type="button"
               className="primary-button hero-action-button"
               onClick={
-                isProductsPage
-                  ? openCreateProduct
-                  : activePage === "settings"
-                    ? () => setActivePage("orders")
-                    : openCreateOrder
+                isCartPage
+                  ? handleCheckoutCart
+                  : isProductsPage
+                    ? openCreateProduct
+                    : activePage === "settings"
+                      ? () => setActivePage("orders")
+                      : openCreateOrder
               }
+              disabled={isCartPage && (cartItems.length === 0 || cartCustomerName.trim() === "" || isCheckingOut)}
             >
-              {isProductsPage
-                ? "Add Product"
-                : activePage === "settings"
-                  ? "Open Orders"
-                  : "New Order"}
+              {isCartPage
+                ? isCheckingOut
+                  ? "Creating Order..."
+                  : "Create Order"
+                : isProductsPage
+                  ? "Add Product"
+                  : activePage === "settings"
+                    ? "Open Orders"
+                    : "New Order"}
             </button>
           </div>
 
@@ -1579,6 +1618,173 @@ function App() {
       </section>
     </>
   );
+
+
+  const renderCartPage = () => {
+    const cartItemsCount = getCartItemsCount();
+    const cartTotal = cartItems.reduce(
+      (sum, item) => sum + Number(item.price) * item.quantity,
+      0
+    );
+
+    return (
+      <>
+        {renderPageHero()}
+
+        <section className="cart-page-shell">
+          <div className="cart-page-main panel-card">
+            <div className="panel-header">
+              <div>
+                <span className="feedback-eyebrow">Selected items</span>
+                <h2>Order Cart</h2>
+                <p>
+                  Review every selected product, update quantities, remove items,
+                  then create a protected order from the cart.
+                </p>
+              </div>
+
+              <span className="panel-chip">
+                {cartItemsCount} item{cartItemsCount === 1 ? "" : "s"}
+              </span>
+            </div>
+
+            {cartItems.length === 0 ? (
+              <div className="cart-page-empty">
+                <span className="cart-page-empty-icon">CT</span>
+                <h3>Your cart is empty</h3>
+                <p>
+                  Add available menu items from Products / Menu to start building
+                  a new customer order.
+                </p>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => setActivePage("products")}
+                >
+                  Browse Products
+                </button>
+              </div>
+            ) : (
+              <div className="cart-page-items">
+                {cartItems.map((item) => (
+                  <article className="cart-page-item" key={item.product_id}>
+                    <img src={item.image_url} alt={item.name} />
+
+                    <div className="cart-page-item-copy">
+                      <span className="product-category-badge">{item.category}</span>
+                      <h3>{item.name}</h3>
+                      <p>{formatCurrency(item.price)} each</p>
+                    </div>
+
+                    <div className="cart-page-quantity">
+                      <button
+                        type="button"
+                        onClick={() => decreaseCartItem(item.product_id)}
+                        disabled={isCheckingOut}
+                        aria-label={`Decrease ${item.name}`}
+                      >
+                        −
+                      </button>
+                      <strong>{item.quantity}</strong>
+                      <button
+                        type="button"
+                        onClick={() => increaseCartItem(item.product_id)}
+                        disabled={isCheckingOut}
+                        aria-label={`Increase ${item.name}`}
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    <div className="cart-page-item-total">
+                      <span>Subtotal</span>
+                      <strong>{formatCurrency(Number(item.price) * item.quantity)}</strong>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="table-action-button danger-button"
+                      onClick={() => removeCartItem(item.product_id)}
+                      disabled={isCheckingOut}
+                    >
+                      Remove
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <aside className="cart-checkout-panel panel-card">
+            <div className="panel-header">
+              <div>
+                <span className="feedback-eyebrow">Checkout</span>
+                <h2>Order Summary</h2>
+                <p>Create a pending order from the selected cart items.</p>
+              </div>
+            </div>
+
+            <label className="form-field">
+              <span>Customer Name</span>
+              <input
+                type="text"
+                value={cartCustomerName}
+                onChange={(event) => setCartCustomerName(event.target.value)}
+                placeholder="Walk-in Guest"
+                disabled={isCheckingOut}
+              />
+            </label>
+
+            <div className="cart-summary-list">
+              <div>
+                <span>Total Items</span>
+                <strong>{cartItemsCount}</strong>
+              </div>
+              <div>
+                <span>Order Status</span>
+                <strong>Pending</strong>
+              </div>
+              <div className="cart-summary-total">
+                <span>Total</span>
+                <strong>{formatCurrency(cartTotal)}</strong>
+              </div>
+            </div>
+
+            <div className="cart-checkout-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={clearCart}
+                disabled={isCheckingOut || cartItems.length === 0}
+              >
+                Clear Cart
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={handleCheckoutCart}
+                disabled={
+                  isCheckingOut ||
+                  cartItems.length === 0 ||
+                  cartCustomerName.trim() === ""
+                }
+              >
+                {isCheckingOut ? "Creating Order..." : "Create Order"}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="widget-link-button"
+              onClick={() => setActivePage("products")}
+            >
+              Continue Shopping
+            </button>
+          </aside>
+        </section>
+      </>
+    );
+  };
 
   const renderProductsPage = () => (
     <>
@@ -1976,6 +2182,7 @@ function App() {
 
   const renderActivePage = () => {
     if (activePage === "products") return renderProductsPage();
+    if (activePage === "cart") return renderCartPage();
     if (activePage === "orders") return renderOrdersPage();
     if (activePage === "analytics") return renderAnalyticsPage();
     if (activePage === "customers") return renderCustomersPage();
@@ -2191,6 +2398,7 @@ function App() {
           primaryActionLabel={activePage === "products" ? "Add Product" : "New Order"}
           onPrimaryAction={activePage === "products" ? openCreateProduct : openCreateOrder}
           onLogout={handleLogout}
+          cartItemsCount={getCartItemsCount()}
         />
 
         <button
@@ -2234,23 +2442,9 @@ function App() {
           activePage={activePage}
           onPageChange={setActivePage}
           onPrimaryAction={activePage === "products" ? openCreateProduct : openCreateOrder}
+          cartItemsCount={getCartItemsCount()}
         />
       </div>
-
-      <CartDrawer
-        isOpen={isCartOpen}
-        cartItems={cartItems}
-        customerName={cartCustomerName}
-        isCheckingOut={isCheckingOut}
-        onCustomerNameChange={setCartCustomerName}
-        onClose={() => setIsCartOpen(false)}
-        onIncrease={increaseCartItem}
-        onDecrease={decreaseCartItem}
-        onRemove={removeCartItem}
-        onClear={clearCart}
-        onCheckout={handleCheckoutCart}
-        formatCurrency={formatCurrency}
-      />
 
       <ProductModal
         isOpen={productFormOpen}

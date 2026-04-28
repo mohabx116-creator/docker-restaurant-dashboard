@@ -1,12 +1,13 @@
 const NAV_ITEMS = [
   { id: "overview", label: "Home", short: "HM" },
   { id: "products", label: "Menu", short: "MN" },
+  { id: "cart", label: "Cart", short: "CT", hasBadge: true },
   { id: "orders", label: "Orders", short: "OR" },
   { id: "analytics", label: "Analytics", short: "AN" },
   { id: "settings", label: "Settings", short: "ST" },
 ];
 
-function BottomNav({ activePage, onPageChange, onPrimaryAction }) {
+function BottomNav({ activePage, onPageChange, onPrimaryAction, cartItemsCount = 0 }) {
   return (
     <>
       <button
@@ -27,7 +28,12 @@ function BottomNav({ activePage, onPageChange, onPrimaryAction }) {
             onClick={() => onPageChange(item.id)}
             aria-current={activePage === item.id ? "page" : undefined}
           >
-            <span className="bottom-nav-icon">{item.short}</span>
+            <span className="bottom-nav-icon">
+              {item.short}
+              {item.hasBadge && cartItemsCount > 0 && (
+                <span className="bottom-cart-badge">{cartItemsCount}</span>
+              )}
+            </span>
             <span>{item.label}</span>
           </button>
         ))}

@@ -9,6 +9,7 @@ const getInitials = (name = "") =>
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", symbol: "OV" },
   { id: "products", label: "Products / Menu", symbol: "MN" },
+  { id: "cart", label: "Order Cart", symbol: "CT", hasBadge: true },
   { id: "orders", label: "Orders", symbol: "OR" },
   { id: "analytics", label: "Analytics", symbol: "AN" },
   { id: "customers", label: "Customers", symbol: "CU" },
@@ -24,6 +25,7 @@ function Sidebar({
   primaryActionLabel,
   onPrimaryAction,
   onLogout,
+  cartItemsCount = 0,
 }) {
   return (
     <aside className={`sidebar-shell ${isMobileOpen ? "mobile-open" : ""}`}>
@@ -64,6 +66,10 @@ function Sidebar({
           >
             <span className="sidebar-nav-icon">{item.symbol}</span>
             <span>{item.label}</span>
+
+            {item.hasBadge && cartItemsCount > 0 && (
+              <span className="sidebar-cart-badge">{cartItemsCount}</span>
+            )}
           </button>
         ))}
       </nav>
