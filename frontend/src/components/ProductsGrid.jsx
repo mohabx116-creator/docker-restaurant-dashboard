@@ -30,6 +30,8 @@ function ProductsGrid({
   onEdit,
   onDelete,
   onToggle,
+  onAddToCart,
+  getCartQuantity,
   deletingProductId,
   togglingProductId,
   formatCurrency,
@@ -76,6 +78,7 @@ function ProductsGrid({
       {products.map((product) => {
         const isDeleting = deletingProductId === product.id;
         const isToggling = togglingProductId === product.id;
+        const cartQuantity = getCartQuantity ? getCartQuantity(product.id) : 0;
 
         return (
           <article className="product-card" key={product.id}>
@@ -89,9 +92,8 @@ function ProductsGrid({
               <div className="product-card-badge-row">
                 <span className="product-category-badge">{product.category}</span>
                 <span
-                  className={`status-badge ${
-                    product.is_available ? "status-completed" : "status-cancelled"
-                  }`}
+                  className={`status-badge ${product.is_available ? "status-completed" : "status-cancelled"
+                    }`}
                 >
                   {product.is_available ? "Available" : "Out of Stock"}
                 </span>
@@ -106,6 +108,19 @@ function ProductsGrid({
                 </div>
                 <strong>{formatCurrency(product.price)}</strong>
               </div>
+
+              <button
+                type="button"
+                className="add-to-cart-button"
+                onClick={() => onAddToCart(product)}
+                disabled={
+                  !product.is_available ||
+                  Boolean(deletingProductId) ||
+                  Boolean(togglingProductId)
+                }
+              >
+                {cartQuantity > 0 ? `Add More (${cartQuantity})` : "Add to Cart"}
+              </button>
 
               <div className="product-card-footer">
                 <div className="product-card-actions">
@@ -129,17 +144,10 @@ function ProductsGrid({
 
                 <button
                   type="button"
-                  className={`availability-toggle ${
-                    product.is_available ? "active" : ""
-                  }`}
+                  className={`availability-toggle ${product.is_available ? "active" : ""}`}
                   onClick={() => onToggle(product.id)}
                   disabled={Boolean(deletingProductId) || Boolean(togglingProductId)}
                   aria-pressed={product.is_available}
-                  aria-label={
-                    product.is_available
-                      ? `Mark ${product.name} as out of stock`
-                      : `Mark ${product.name} as available`
-                  }
                 >
                   <span>{isToggling ? "..." : product.is_available ? "On" : "Off"}</span>
                   <span className="availability-toggle-knob" aria-hidden="true"></span>

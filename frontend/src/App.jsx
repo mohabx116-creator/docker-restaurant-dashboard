@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
@@ -11,6 +11,7 @@ import ProductsGrid from "./components/ProductsGrid";
 import ProductModal from "./components/ProductModal";
 import ToastStack from "./components/ToastStack";
 import ConfirmDialog from "./components/ConfirmDialog";
+import CartDrawer from "./components/CartDrawer";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -140,6 +141,10 @@ function App() {
 
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
+  const [cartItems, setCartItems] = useState([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cartCustomerName, setCartCustomerName] = useState("Walk-in Guest");
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
@@ -270,6 +275,120 @@ function App() {
     setSortBy("name-asc");
   };
 
+  const getCartQuantity = (productId) => {
+    const item = cartItems.find((cartItem) => cartItem.product_id === productId);
+    return item ? item.quantity : 0;
+  };
+
+  const getCartItemsCount = () =>
+    cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  const handleAddToCart = (product) => {
+    if (!product.is_available) {
+      addToast("Item unavailable", `${product.name} is currently out of stock.`, "error");
+      return;
+    }
+
+    setCartItems((currentItems) => {
+      const existingItem = currentItems.find((item) => item.product_id === product.id);
+
+      if (existingItem) {
+        return currentItems.map((item) =>
+          item.product_id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+
+      return [
+        ...currentItems,
+        {
+          product_id: product.id,
+          name: product.name,
+          price: Number(product.price),
+          image_url: product.image_url,
+          category: product.category,
+          quantity: 1,
+        },
+      ];
+    });
+
+    setIsCartOpen(true);
+  };
+
+  const increaseCartItem = (productId) => {
+    setCartItems((currentItems) =>
+      currentItems.map((item) =>
+        item.product_id === productId
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      )
+    );
+  };
+
+  const decreaseCartItem = (productId) => {
+    setCartItems((currentItems) =>
+      currentItems
+        .map((item) =>
+          item.product_id === productId
+            ? { ...item, quantity: item.quantity - 1 }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
+  };
+
+  const removeCartItem = (productId) => {
+    setCartItems((currentItems) =>
+      currentItems.filter((item) => item.product_id !== productId)
+    );
+  };
+
+  const clearCart = () => {
+    setCartItems([]);
+  };
+
+  const handleCheckoutCart = async () => {
+    const trimmedCustomerName = cartCustomerName.trim();
+
+    if (!trimmedCustomerName || cartItems.length === 0) return;
+
+    setIsCheckingOut(true);
+
+    try {
+      await apiRequest("/orders/cart", {
+        method: "POST",
+        body: {
+          customer_name: trimmedCustomerName,
+          items: cartItems.map((item) => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+          })),
+        },
+      });
+
+      setCartItems([]);
+      setCartCustomerName("Walk-in Guest");
+      setIsCartOpen(false);
+      await fetchOrders();
+      setActivePage("orders");
+
+      addToast(
+        "Order created",
+        "The cart was converted into a real order successfully.",
+        "success"
+      );
+    } catch (error) {
+      addToast(
+        "Checkout failed",
+        error instanceof Error ? error.message : "Failed to create order from cart",
+        "error"
+      );
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
   const fetchOrders = async () => {
     if (!token) return;
 
@@ -323,7 +442,7 @@ function App() {
 
   useEffect(() => {
     const shouldLockBody =
-      isMobileSidebarOpen || productFormOpen || Boolean(confirmDialog);
+      isMobileSidebarOpen || productFormOpen || isCartOpen || Boolean(confirmDialog);
 
     if (!shouldLockBody) return undefined;
 
@@ -333,7 +452,7 @@ function App() {
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [confirmDialog, isMobileSidebarOpen, productFormOpen]);
+  }, [confirmDialog, isCartOpen, isMobileSidebarOpen, productFormOpen]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -410,6 +529,9 @@ function App() {
     resetProductForm();
     clearOrderFilters();
     clearProductFilters();
+    setCartItems([]);
+    setIsCartOpen(false);
+    setCartCustomerName("Walk-in Guest");
   };
 
   const handleSubmitOrder = async (event) => {
@@ -792,8 +914,8 @@ function App() {
   const highestOrderValue =
     totalOrders > 0
       ? Math.max(
-          ...sortedFilteredOrders.map((order) => Number(order.total_price || 0))
-        )
+        ...sortedFilteredOrders.map((order) => Number(order.total_price || 0))
+      )
       : 0;
   const completionRate =
     totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0;
@@ -828,7 +950,7 @@ function App() {
   const averageProductPrice =
     totalProducts > 0
       ? products.reduce((sum, product) => sum + Number(product.price), 0) /
-        totalProducts
+      totalProducts
       : 0;
 
   const productKpis = [
@@ -1294,6 +1416,17 @@ function App() {
               {isProductsPage ? "Export Menu" : "Export Snapshot"}
             </button>
 
+            {isProductsPage && (
+              <button
+                type="button"
+                className="secondary-button hero-action-button"
+                onClick={() => setIsCartOpen(true)}
+                disabled={cartItems.length === 0}
+              >
+                Cart ({getCartItemsCount()})
+              </button>
+            )}
+
             <button
               type="button"
               className="primary-button hero-action-button"
@@ -1477,6 +1610,8 @@ function App() {
         onEdit={openEditProduct}
         onDelete={requestDeleteProduct}
         onToggle={handleToggleProduct}
+        onAddToCart={handleAddToCart}
+        getCartQuantity={getCartQuantity}
         deletingProductId={deletingProductId}
         togglingProductId={togglingProductId}
         formatCurrency={formatCurrency}
@@ -2101,6 +2236,21 @@ function App() {
           onPrimaryAction={activePage === "products" ? openCreateProduct : openCreateOrder}
         />
       </div>
+
+      <CartDrawer
+        isOpen={isCartOpen}
+        cartItems={cartItems}
+        customerName={cartCustomerName}
+        isCheckingOut={isCheckingOut}
+        onCustomerNameChange={setCartCustomerName}
+        onClose={() => setIsCartOpen(false)}
+        onIncrease={increaseCartItem}
+        onDecrease={decreaseCartItem}
+        onRemove={removeCartItem}
+        onClear={clearCart}
+        onCheckout={handleCheckoutCart}
+        formatCurrency={formatCurrency}
+      />
 
       <ProductModal
         isOpen={productFormOpen}
