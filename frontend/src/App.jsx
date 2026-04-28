@@ -435,7 +435,7 @@ function App() {
 
   const primaryKpis = [
     {
-      icon: "$",
+      icon: "RV",
       label: "Total Revenue",
       value: formatCurrency(totalRevenue),
       badge: `${uniqueCustomers} guests`,
@@ -443,7 +443,7 @@ function App() {
       description: "Revenue in the current view.",
     },
     {
-      icon: "Ord",
+      icon: "OR",
       label: "Total Orders",
       value: totalOrders,
       badge: hasActiveFilters ? "Filtered" : "Live",
@@ -451,7 +451,7 @@ function App() {
       description: "Protected orders in scope.",
     },
     {
-      icon: "Avg",
+      icon: "AV",
       label: "Average Order",
       value: formatCurrency(averageOrder),
       badge: `${uniqueCustomers || 0} customers`,
@@ -459,7 +459,7 @@ function App() {
       description: "Average ticket value.",
     },
     {
-      icon: "OK",
+      icon: "CM",
       label: "Completed Orders",
       value: completedOrders,
       badge: `${completionRate}% closed`,
@@ -470,7 +470,7 @@ function App() {
 
   const secondaryKpis = [
     {
-      icon: "P",
+      icon: "PN",
       label: "Pending Orders",
       value: pendingOrders,
       badge: totalOrders ? `${Math.round((pendingOrders / totalOrders) * 100)}%` : "0%",
@@ -478,7 +478,7 @@ function App() {
       description: "Waiting for kitchen action.",
     },
     {
-      icon: "Prep",
+      icon: "PR",
       label: "Preparing Orders",
       value: preparingOrders,
       badge: totalOrders
@@ -488,7 +488,7 @@ function App() {
       description: "In active preparation.",
     },
     {
-      icon: "Cust",
+      icon: "CU",
       label: "Active Customers",
       value: uniqueCustomers,
       badge: topCustomer ? "Top guest live" : "Awaiting data",
@@ -496,7 +496,7 @@ function App() {
       description: "Unique customers in view.",
     },
     {
-      icon: "Hi",
+      icon: "MX",
       label: "Highest Order",
       value: formatCurrency(highestOrderValue),
       badge: topCustomer ? topCustomer.name : "No leader yet",
@@ -507,7 +507,7 @@ function App() {
 
   const customerKpis = [
     {
-      icon: "Cust",
+      icon: "CU",
       label: "Unique Customers",
       value: uniqueCustomers,
       badge: hasActiveFilters ? "Filtered view" : "Live base",
@@ -515,7 +515,7 @@ function App() {
       description: "Customers derived from protected orders.",
     },
     {
-      icon: "$",
+      icon: "TP",
       label: "Top Customer",
       value: topCustomer ? formatCurrency(topCustomer.total) : formatCurrency(0),
       badge: topCustomer ? topCustomer.name : "No customer yet",
@@ -523,7 +523,7 @@ function App() {
       description: "Highest customer revenue contribution.",
     },
     {
-      icon: "Avg",
+      icon: "AV",
       label: "Average Customer Value",
       value: formatCurrency(averageCustomerRevenue),
       badge: repeatLeader ? repeatLeader.name : "No repeat guest",
@@ -531,7 +531,7 @@ function App() {
       description: "Revenue per customer in the current view.",
     },
     {
-      icon: "Rpt",
+      icon: "RT",
       label: "Most Frequent Customer",
       value: repeatLeader ? repeatLeader.totalOrders : 0,
       badge: repeatLeader ? repeatLeader.name : "No visits yet",
@@ -696,14 +696,14 @@ function App() {
   };
 
   const renderPageHero = () => (
-    <section className="overview-hero">
-      <div>
+    <section className={`overview-hero page-hero page-${activePage}-hero`}>
+      <div className="page-hero-copy">
         <span className="hero-eyebrow">{currentPage.title}</span>
         <h1>{currentPage.title}</h1>
         <p>{currentPage.subtitle}</p>
       </div>
 
-      <div className="overview-actions">{renderPageHeroAside()}</div>
+      <div className="overview-actions page-hero-aside">{renderPageHeroAside()}</div>
     </section>
   );
 
@@ -1150,7 +1150,7 @@ function App() {
         <div className="panel-card settings-card">
           <div className="panel-header">
             <div>
-              <h2>Profile</h2>
+              <h2>Account Snapshot</h2>
               <p>Logged-in account details from the active JWT session.</p>
             </div>
             <span className="panel-chip">Account</span>
@@ -1188,7 +1188,7 @@ function App() {
         <div className="panel-card settings-card">
           <div className="panel-header">
             <div>
-              <h2>Application Stack</h2>
+              <h2>Platform Stack</h2>
               <p>Current services used by the dashboard workspace.</p>
             </div>
             <span className="panel-chip">App Info</span>
@@ -1221,7 +1221,7 @@ function App() {
         <div className="panel-card settings-card">
           <div className="panel-header">
             <div>
-              <h2>Local Environment</h2>
+              <h2>Local Workspace</h2>
               <p>Operational details for the current local Docker workflow.</p>
             </div>
             <span className="panel-chip">Local</span>
@@ -1356,7 +1356,7 @@ function App() {
       />
 
       <main className="dashboard-main">
-        <div className="dashboard-content">
+        <div className={`dashboard-content page-${activePage}`}>
           <Topbar
             currentUser={displayUser}
             pageTitle={currentPage.title}

@@ -7,11 +7,11 @@ const getInitials = (name = "") =>
     .join("") || "RD";
 
 const NAV_ITEMS = [
-  { id: "overview", label: "Overview" },
-  { id: "orders", label: "Orders" },
-  { id: "analytics", label: "Analytics" },
-  { id: "customers", label: "Customers" },
-  { id: "settings", label: "Settings" },
+  { id: "overview", label: "Overview", symbol: "OV" },
+  { id: "orders", label: "Orders", symbol: "OR" },
+  { id: "analytics", label: "Analytics", symbol: "AN" },
+  { id: "customers", label: "Customers", symbol: "CU" },
+  { id: "settings", label: "Settings", symbol: "ST" },
 ];
 
 function Sidebar({ currentUser, activePage, onPageChange }) {
@@ -19,15 +19,13 @@ function Sidebar({ currentUser, activePage, onPageChange }) {
     <aside className="sidebar-shell">
       <div className="sidebar-brand">
         <div className="brand-mark">RD</div>
-        <div>
+        <div className="sidebar-brand-copy">
           <strong>Restaurant Dashboard</strong>
-          <span>Dashboard Lite</span>
+          <span>Editorial Admin</span>
         </div>
       </div>
 
-      <p className="sidebar-copy">
-        Berry-inspired structure tailored to a restaurant SaaS workspace.
-      </p>
+      <p className="sidebar-copy">Dashboard Lite</p>
 
       <nav className="sidebar-nav">
         {NAV_ITEMS.map((item) => (
@@ -38,7 +36,8 @@ function Sidebar({ currentUser, activePage, onPageChange }) {
             onClick={() => onPageChange(item.id)}
             aria-current={activePage === item.id ? "page" : undefined}
           >
-            {item.label}
+            <span className="sidebar-nav-icon">{item.symbol}</span>
+            <span>{item.label}</span>
           </button>
         ))}
       </nav>

@@ -27,20 +27,20 @@ function Topbar({
         </div>
       </div>
 
-      <div className="topbar-context">
-        <span>Current View</span>
-        <strong>{pageTitle}</strong>
-      </div>
+      <div className="topbar-leading">
+        <span className="topbar-page-pill">{pageTitle}</span>
 
-      <label className="topbar-search">
-        <span className="sr-only">Search</span>
-        <input
-          type="search"
-          placeholder="Search analytics, orders, or customers..."
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-      </label>
+        <label className="topbar-search">
+          <span className="topbar-search-icon">/</span>
+          <span className="sr-only">Search</span>
+          <input
+            type="search"
+            placeholder="Search analytics, orders, or customers..."
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        </label>
+      </div>
 
       <div className="topbar-actions">
         <button type="button" className="icon-button" aria-label="Notifications">
