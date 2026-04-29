@@ -1316,18 +1316,6 @@ function App() {
   const averageCustomerRevenue =
     uniqueCustomers > 0 ? totalRevenue / uniqueCustomers : 0;
 
-  const statusBreakdown = ORDER_STATUSES.map((status) => {
-    const count = sortedFilteredOrders.filter(
-      (order) => getOrderStatus(order.status) === status.value
-    ).length;
-
-    return {
-      ...status,
-      count,
-      percentage: totalOrders > 0 ? Math.round((count / totalOrders) * 100) : 0,
-    };
-  });
-
   const totalProducts = products.length;
   const activeProducts = products.filter((product) => product.is_available).length;
   const outOfStockProducts = products.filter((product) => !product.is_available).length;
@@ -1336,6 +1324,38 @@ function App() {
       ? products.reduce((sum, product) => sum + Number(product.price), 0) /
       totalProducts
       : 0;
+  const topCategories = Array.isArray(analyticsOverview?.top_categories)
+    ? analyticsOverview.top_categories
+    : productsByCategory.map((item) => ({
+      category: item.category,
+      total_quantity: item.count,
+      total_revenue: 0,
+    }));
+  const categoryTotalQuantity = topCategories.reduce(
+    (sum, item) => sum + Number(item.total_quantity || 0),
+    0
+  );
+  const visibleCategoryDistribution = topCategories.slice(0, 4).map((item) => ({
+    ...item,
+    percentage: categoryTotalQuantity
+      ? Math.round((Number(item.total_quantity || 0) / categoryTotalQuantity) * 100)
+      : 0,
+  }));
+  const salesPerformanceData = Array.from({ length: 10 }).map((_, index) => {
+    const item = Array.isArray(analyticsOverview?.revenue_by_day)
+      ? analyticsOverview.revenue_by_day[index]
+      : null;
+
+    return {
+      label: index === 0 ? "1 Jun" : index === 3 ? "7 Jun" : index === 6 ? "14 Jun" : index === 8 ? "21 Jun" : index === 9 ? "30 Jun" : "",
+      value: Number(item?.revenue || 0),
+      orders: Number(item?.orders || 0),
+    };
+  });
+  const maxSalesPerformanceValue = Math.max(
+    1,
+    ...salesPerformanceData.map((item) => item.value || item.orders)
+  );
 
   const productKpis = [
     {
@@ -1374,7 +1394,7 @@ function App() {
 
   const primaryKpis = [
     {
-      icon: "RV",
+      icon: "$",
       label: "Total Revenue",
       value: formatCurrency(totalRevenue),
       badge: `${uniqueCustomers} guests`,
@@ -1382,7 +1402,7 @@ function App() {
       description: "Revenue in the current filtered view.",
     },
     {
-      icon: "OR",
+      icon: "▣",
       label: "Total Orders",
       value: totalOrders,
       badge: `${liveAttentionCount} active`,
@@ -1390,7 +1410,7 @@ function App() {
       description: "Protected orders currently in scope.",
     },
     {
-      icon: "PN",
+      icon: "◷",
       label: "Pending Orders",
       value: pendingOrders,
       badge: totalOrders ? `${Math.round((pendingOrders / totalOrders) * 100)}% open` : "0% open",
@@ -1398,7 +1418,7 @@ function App() {
       description: "Waiting for kitchen action.",
     },
     {
-      icon: "CM",
+      icon: "✓",
       label: "Completed Orders",
       value: completedOrders,
       badge: `${completionRate}% closed`,
@@ -1410,7 +1430,7 @@ function App() {
   const analyticsKpis = [
     {
       icon: "$",
-      label: "Total Sales",
+      label: "Net Revenue",
       value: formatCurrency(analyticsOverview?.total_revenue ?? totalRevenue),
       badge: "↗ +12.5%",
       tone: "success",
@@ -1439,6 +1459,14 @@ function App() {
       badge: "↘ -2.1%",
       tone: "danger",
       description: "Average ticket value.",
+    },
+    {
+      icon: "◎",
+      label: "Retention Rate",
+      value: uniqueCustomers ? `${Math.min(100, Math.round((completedOrders / Math.max(totalOrders, 1)) * 100))}%` : "0%",
+      badge: "↗ +3%",
+      tone: "success",
+      description: "Completed order share from live orders.",
     },
   ];
 
@@ -2020,6 +2048,7 @@ function App() {
           formatDate={formatDate}
           getOrderStatus={getOrderStatus}
           statusLabels={STATUS_LABELS}
+          variant="compact"
         />
       </section>
     </>
@@ -2343,40 +2372,61 @@ function App() {
   );
 
   const renderAnalyticsPage = () => (
-    <section className="analytics-page">
-      <header className="settings-page-header">
+    <section className="analytics-page analytics-report-page">
+      <header className="analytics-report-topbar">
+        <h1>Analytics Dashboard</h1>
+        <nav aria-label="Analytics views">
+          <button type="button">Overview</button>
+          <button type="button" className="active">Reports</button>
+          <button type="button">Real-time</button>
+        </nav>
+        <label className="analytics-report-search">
+          <span className="sr-only">Search analytics</span>
+          <input
+            type="search"
+            placeholder="Search analytics..."
+            value={ordersSearchQuery}
+            onChange={(event) => setOrdersSearchQuery(event.target.value)}
+          />
+        </label>
+      </header>
+
+      <header className="analytics-report-hero">
         <div>
-          <h1>Analytics</h1>
-          <p>Track performance and business metrics</p>
+          <h2>Analytics &amp; Insights</h2>
+          <p>Comprehensive performance breakdown for your establishment</p>
+        </div>
+        <div className="analytics-report-actions">
+          <button type="button" className="secondary-button">Last 30 Days</button>
+          <button type="button" className="secondary-button" onClick={handleExportOrders}>
+            Export PDF
+          </button>
         </div>
       </header>
 
-      <section className="kpi-grid">
+      <section className="analytics-report-kpis">
         {analyticsKpis.map((card) => (
           <KpiCard key={card.label} {...card} />
         ))}
       </section>
 
-      <section className="analytics-main-grid">
-        <div className="analytics-chart-card">
-          <div className="panel-header">
-            <div>
-              <h2>Hourly Orders</h2>
-              <p>Peak hours are derived from order timestamps.</p>
-            </div>
-            <div className="analytics-segmented">
-              <button type="button" className="active">Today</button>
-              <button type="button">Week</button>
-              <button type="button">Month</button>
+      <section className="analytics-report-main">
+        <div className="analytics-report-card sales-performance-card">
+          <div className="analytics-report-card-header">
+            <h3>Sales Performance</h3>
+            <div className="analytics-legend">
+              <span><i />Current Period</span>
+              <span><i />Previous Period</span>
             </div>
           </div>
-
-          <div className="hourly-chart" aria-label="Hourly orders chart">
-            {hourlyChartData.map((item) => (
-              <div className="hourly-bar-wrap" key={item.hour}>
+          <div className="sales-performance-bars">
+            {salesPerformanceData.map((item, index) => (
+              <div className="sales-performance-bar" key={`${item.label}-${index}`}>
                 <span
-                  className={item.orders >= maxHourlyOrders * 0.75 ? "hot" : ""}
-                  style={{ height: `${Math.max(12, (item.orders / maxHourlyOrders) * 100)}%` }}
+                  className={index === salesPerformanceData.length - 1 ? "active" : ""}
+                  style={{
+                    height: `${Math.max(8, ((item.value || item.orders) / maxSalesPerformanceValue) * 100)}%`,
+                  }}
                 />
                 <small>{item.label}</small>
               </div>
@@ -2384,61 +2434,92 @@ function App() {
           </div>
         </div>
 
-        <aside className="analytics-top-products">
-          <h2>Top Products</h2>
-          <div className="top-products-list">
-            {popularProducts.length === 0 ? (
-              <p className="mini-empty">No product analytics available yet.</p>
-            ) : (
-              popularProducts.slice(0, 5).map((product, index) => (
-                <div className="top-product-row" key={product.product_id}>
-                  <span className="top-product-rank">{index + 1}</span>
-                  <div>
-                    <strong>{product.name}</strong>
-                    <small>
-                      {product.total_quantity} sales · {formatCurrency(product.total_revenue)}
-                    </small>
-                  </div>
-                  <em>+{Math.max(3, Math.round(product.total_quantity || 1))}%</em>
-                </div>
-              ))
-            )}
+        <aside className="analytics-report-card category-card">
+          <h3>Popular Categories</h3>
+          <div className="category-donut" aria-label="Popular category groups">
+            <strong>{visibleCategoryDistribution.length || productsByCategory.length}</strong>
+            <span>Groups</span>
+          </div>
+          <div className="category-list">
+            {(visibleCategoryDistribution.length ? visibleCategoryDistribution : productsByCategory).slice(0, 4).map((item, index) => (
+              <div className="category-list-row" key={item.category}>
+                <span className={`category-dot dot-${index}`} />
+                <span>{item.category}</span>
+                <strong>{item.percentage ?? item.count ?? 0}%</strong>
+              </div>
+            ))}
           </div>
         </aside>
       </section>
 
-      <section className="analytics-bottom-grid">
-        <div className="analytics-card">
-          <h2>Revenue Distribution</h2>
-          {statusBreakdown.slice(0, 3).map((status) => (
-            <div className="distribution-row" key={status.value}>
-              <div>
-                <span>{status.label}</span>
-                <strong>{status.percentage}%</strong>
-              </div>
-              <i style={{ width: `${Math.max(status.percentage, 4)}%` }} />
+      <section className="analytics-report-card peak-volume-card">
+        <div className="analytics-report-card-header">
+          <h3>Peak Order Volume</h3>
+          <span className="report-chip">Hourly Basis</span>
+        </div>
+        <div className="peak-volume-chart">
+          {hourlyChartData.map((item, index) => (
+            <div className="peak-volume-bar" key={item.hour}>
+              <span
+                className={item.orders >= maxHourlyOrders * 0.75 ? "active" : ""}
+                style={{ height: `${Math.max(7, (item.orders / maxHourlyOrders) * 100)}%` }}
+              />
+              <small>{index % 2 === 0 ? item.label.toUpperCase() : ""}</small>
             </div>
           ))}
         </div>
+      </section>
 
-        <div className="analytics-card">
-          <h2>Customer Insights</h2>
-          <div className="insight-tile">
-            <span>New Customers</span>
-            <strong>{uniqueCustomers}</strong>
-            <em>+18%</em>
+      <section className="analytics-report-bottom">
+        <div className="analytics-report-card top-selling-card">
+          <div className="analytics-report-card-header">
+            <h3>Top Selling Items</h3>
+            <button type="button" onClick={() => setActivePage("products")}>
+              View Full Menu
+            </button>
           </div>
-          <div className="insight-tile">
-            <span>Repeat Customers</span>
-            <strong>{repeatLeader ? repeatLeader.totalOrders : 0}</strong>
-            <em>+12%</em>
-          </div>
-          <div className="insight-tile">
-            <span>Avg. Order Value</span>
-            <strong>{formatCurrency(averageOrder)}</strong>
-            <em>+0.3</em>
+          <div className="top-selling-table">
+            <div className="top-selling-head">
+              <span>Item Name</span>
+              <span>Orders</span>
+              <span>Revenue</span>
+              <span>Trend</span>
+            </div>
+            {(popularProducts.length ? popularProducts : []).slice(0, 3).map((product, index) => (
+              <div className="top-selling-row" key={product.product_id}>
+                <div>
+                  <img src={product.image_url || getFallbackProductImage()} alt={product.name} />
+                  <strong>{product.name}</strong>
+                </div>
+                <span>{product.total_quantity}</span>
+                <strong>{formatCurrency(product.total_revenue)}</strong>
+                <em className={index === 2 ? "down" : ""}>{index === 2 ? "↘" : "↗"}</em>
+              </div>
+            ))}
+            {popularProducts.length === 0 && (
+              <p className="mini-empty">No product analytics available yet.</p>
+            )}
           </div>
         </div>
+
+        <aside className="customer-satisfaction-card">
+          <h3>Customer Satisfaction</h3>
+          <p>Based on {Math.max(totalOrders, 0)} verified orders this month.</p>
+          <strong>4.8 <span>/ 5.0</span></strong>
+          <div className="rating-stars">★ ★ ★ ★ ★</div>
+          <div className="satisfaction-bars">
+            <div>
+              <span>Excellent</span>
+              <strong>{completionRate}%</strong>
+              <i style={{ width: `${completionRate}%` }} />
+            </div>
+            <div>
+              <span>Good</span>
+              <strong>{Math.max(0, 100 - completionRate)}%</strong>
+              <i style={{ width: `${Math.max(0, 100 - completionRate)}%` }} />
+            </div>
+          </div>
+        </aside>
       </section>
     </section>
   );

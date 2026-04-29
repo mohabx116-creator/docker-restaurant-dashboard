@@ -20,6 +20,8 @@ const formatRelativeTime = (value) => {
   return `${hours} hour${hours === 1 ? "" : "s"} ago`;
 };
 
+const formatOrderId = (id) => `#ORD-${String(id || 0).padStart(4, "0")}`;
+
 function OrdersTable({
   orders,
   totalOrders,
@@ -37,7 +39,10 @@ function OrdersTable({
   formatDate,
   getOrderStatus,
   statusLabels,
+  variant = "full",
 }) {
+  const isCompact = variant === "compact";
+
   if (isLoading) {
     return (
       <div className="orders-loading" aria-label="Loading orders">
@@ -88,34 +93,38 @@ function OrdersTable({
         disabled={isBusy || !onView}
       >
         <AppIcon name="view" size={15} />
-        <span>View</span>
+        <span>{isCompact ? "Details" : "View"}</span>
       </button>
-      <button
-        type="button"
-        className="orders-action-button"
-        onClick={() => onEdit(order)}
-        disabled={isBusy}
-      >
-        Edit
-      </button>
-      <button
-        type="button"
-        className="orders-action-button orders-delete-button"
-        onClick={() => onDelete?.(order.id)}
-        disabled={isBusy || deletingOrderId === order.id || !onDelete}
-      >
-        <AppIcon name="delete" size={14} />
-        <span className="sr-only">Delete</span>
-      </button>
-      <button
-        type="button"
-        className="orders-action-button orders-more-button"
-        onClick={() => onUpdateStatus?.(order)}
-        disabled={isBusy || !onUpdateStatus}
-        aria-label="Update status"
-      >
-        ...
-      </button>
+      {!isCompact && (
+        <>
+          <button
+            type="button"
+            className="orders-action-button"
+            onClick={() => onEdit(order)}
+            disabled={isBusy}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            className="orders-action-button orders-delete-button"
+            onClick={() => onDelete?.(order.id)}
+            disabled={isBusy || deletingOrderId === order.id || !onDelete}
+          >
+            <AppIcon name="delete" size={14} />
+            <span className="sr-only">Delete</span>
+          </button>
+          <button
+            type="button"
+            className="orders-action-button orders-more-button"
+            onClick={() => onUpdateStatus?.(order)}
+            disabled={isBusy || !onUpdateStatus}
+            aria-label="Update status"
+          >
+            ...
+          </button>
+        </>
+      )}
     </div>
   );
 
@@ -132,7 +141,7 @@ function OrdersTable({
             >
               <div className="orders-mobile-card-top">
                 <div className="orders-mobile-ident">
-                  <span className="orders-mobile-id">#{order.id}</span>
+                  <span className="orders-mobile-id">{formatOrderId(order.id)}</span>
                   <div>
                     <strong>{order.customer_name || "Walk-in Guest"}</strong>
                     <span>{order.items_summary || "Manual order"}</span>
@@ -158,16 +167,16 @@ function OrdersTable({
       </div>
 
       <div className="orders-table-wrap">
-        <table className="orders-table">
+        <table className={`orders-table ${isCompact ? "orders-table-compact" : ""}`}>
           <thead>
             <tr>
               <th className="orders-cell">Order ID</th>
               <th className="orders-cell">Customer</th>
               <th className="orders-cell">Items</th>
-              <th className="orders-cell">Total</th>
+              <th className="orders-cell">{isCompact ? "Total Price" : "Total"}</th>
               <th className="orders-cell">Status</th>
-              <th className="orders-cell">Time</th>
-              <th className="orders-cell orders-cell-actions">Actions</th>
+              {!isCompact && <th className="orders-cell">Time</th>}
+              <th className="orders-cell orders-cell-actions">{isCompact ? "Action" : "Actions"}</th>
             </tr>
           </thead>
 
@@ -180,7 +189,7 @@ function OrdersTable({
                   key={order.id}
                   className={`orders-row ${editingOrderId === order.id ? "active" : ""}`}
                 >
-                  <td className="orders-cell">#{order.id}</td>
+                  <td className="orders-cell">{formatOrderId(order.id)}</td>
                   <td className="orders-cell">
                     <div className="orders-customer-cell">
                       <span>{getInitials(order.customer_name)}</span>
@@ -196,7 +205,11 @@ function OrdersTable({
                       {statusLabels[status]}
                     </span>
                   </td>
-                  <td className="orders-cell">{formatRelativeTime(order.created_at) || formatDate(order.created_at)}</td>
+                  {!isCompact && (
+                    <td className="orders-cell">
+                      {formatRelativeTime(order.created_at) || formatDate(order.created_at)}
+                    </td>
+                  )}
                   <td className="orders-cell orders-cell-actions">{renderActions(order)}</td>
                 </tr>
               );
