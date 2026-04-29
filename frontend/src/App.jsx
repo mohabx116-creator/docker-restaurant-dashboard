@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
@@ -134,8 +134,8 @@ const getFallbackProductImage = () => "/products/smokehouse-royale-burger.jpg";
 function App() {
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("mohab@test.com");
-  const [password, setPassword] = useState("123456");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [currentUser, setCurrentUser] = useState(parseStoredUser);
@@ -184,6 +184,7 @@ function App() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedAvailability, setSelectedAvailability] = useState("all");
+  const [ordersSortBy, setOrdersSortBy] = useState("newest");
   const [sortBy, setSortBy] = useState("name-asc");
 
   const addToast = (title, message, type = "info") => {
@@ -812,6 +813,25 @@ function App() {
     }
 
     return Number(b.id || 0) - Number(a.id || 0);
+  });
+
+  const orderPageOrders = [...sortedFilteredOrders].sort((a, b) => {
+    if (ordersSortBy === "oldest") {
+      const dateDifference = getDateValue(a.created_at) - getDateValue(b.created_at);
+      return dateDifference !== 0
+        ? dateDifference
+        : Number(a.id || 0) - Number(b.id || 0);
+    }
+
+    if (ordersSortBy === "amount-high") {
+      return Number(b.total_price || 0) - Number(a.total_price || 0);
+    }
+
+    if (ordersSortBy === "amount-low") {
+      return Number(a.total_price || 0) - Number(b.total_price || 0);
+    }
+
+    return 0;
   });
 
   const filteredProducts = products
@@ -1770,32 +1790,103 @@ function App() {
   );
 
   const renderOrdersPage = () => (
-    <>
-      {renderPageHero()}
+    <section className="orders-page">
+      <header className="orders-header">
+        <div className="orders-heading">
+          <span className="orders-eyebrow">Operations</span>
+          <h1>Orders</h1>
+          <p>
+            Track live orders, filter service status, and manage each customer
+            ticket from one focused workspace.
+          </p>
+        </div>
 
-      {renderOrdersFiltersPanel(
-        "Filter by customer name from the topbar and narrow the order queue by service status."
-      )}
+        <div className="orders-toolbar" aria-label="Orders tools">
+          <label className="orders-search">
+            <span className="sr-only">Search orders</span>
+            <input
+              type="search"
+              value={ordersSearchQuery}
+              placeholder="Search customer"
+              onChange={(event) => setOrdersSearchQuery(event.target.value)}
+              disabled={isWorking}
+            />
+          </label>
 
-      <section className="operations-grid">
-        <div className="panel-card table-panel">
-          <div className="panel-header">
+          <label className="orders-select">
+            <span>Status</span>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              disabled={isWorking}
+            >
+              <option value="all">All Statuses</option>
+              {ORDER_STATUSES.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="orders-select">
+            <span>Sort</span>
+            <select
+              value={ordersSortBy}
+              onChange={(event) => setOrdersSortBy(event.target.value)}
+              disabled={isWorking}
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="amount-high">Amount High</option>
+              <option value="amount-low">Amount Low</option>
+            </select>
+          </label>
+        </div>
+      </header>
+
+      <section className="orders-summary-grid" aria-label="Orders summary">
+        <article className="orders-summary-card">
+          <span>Total Orders</span>
+          <strong>{totalOrders}</strong>
+        </article>
+        <article className="orders-summary-card">
+          <span>Pending Orders</span>
+          <strong>{pendingOrders}</strong>
+        </article>
+        <article className="orders-summary-card">
+          <span>Completed Orders</span>
+          <strong>{completedOrders}</strong>
+        </article>
+        <article className="orders-summary-card">
+          <span>Revenue</span>
+          <strong>{formatCurrency(totalRevenue)}</strong>
+        </article>
+      </section>
+
+      <section className="orders-content-grid">
+        <div className="orders-table-panel">
+          <div className="orders-panel-header">
             <div>
-              <h2>Orders</h2>
+              <h2>Order Queue</h2>
               <p>
-                A polished operational table backed by the same protected CRUD
-                flow.
+                {normalizedOrdersSearchQuery !== "" || statusFilter !== "all"
+                  ? `${orderPageOrders.length} matching orders`
+                  : `${orders.length} total orders`}
               </p>
             </div>
-            <span className="panel-chip">
-              {normalizedOrdersSearchQuery !== "" || statusFilter !== "all"
-                ? `${sortedFilteredOrders.length} matching`
-                : `${orders.length} total`}
-            </span>
+            <button
+              type="button"
+              className="orders-create-button"
+              onClick={openCreateOrder}
+              disabled={isWorking}
+            >
+              Create Order
+            </button>
           </div>
 
           <OrdersTable
-            orders={sortedFilteredOrders}
+            orders={orderPageOrders}
             totalOrders={orders.length}
             hasActiveFilters={
               normalizedOrdersSearchQuery !== "" || statusFilter !== "all"
@@ -1806,6 +1897,7 @@ function App() {
             isLoading={isOrdersLoading}
             onEdit={handleEditOrder}
             onDelete={requestDeleteOrder}
+            onCreate={openCreateOrder}
             formatCurrency={formatCurrency}
             formatDate={formatDate}
             getOrderStatus={getOrderStatus}
@@ -1813,7 +1905,7 @@ function App() {
           />
         </div>
 
-        <div className="form-column">
+        <div className="orders-form-panel">
           <OrderForm
             editingOrderId={editingOrderId}
             customerName={customerName}
@@ -1829,7 +1921,7 @@ function App() {
           />
         </div>
       </section>
-    </>
+    </section>
   );
 
   const renderAnalyticsPage = () => (

@@ -8,62 +8,88 @@ function OrdersTable({
   isLoading,
   onEdit,
   onDelete,
+  onCreate,
   formatCurrency,
   formatDate,
   getOrderStatus,
   statusLabels,
 }) {
-  if (isLoading && totalOrders === 0) {
-    return <p className="status-message">Loading orders...</p>;
+  if (isLoading) {
+    return (
+      <div className="orders-loading" aria-label="Loading orders">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div className="orders-skeleton-row" key={index}>
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+        ))}
+      </div>
+    );
   }
 
   if (orders.length === 0) {
     return (
-      <p className="status-message">
-        {totalOrders === 0
-          ? "No orders yet. Add your first order to get started."
-          : hasActiveFilters
-            ? "No orders match the active search and status filters."
-            : "No orders available for this account yet."}
-      </p>
+      <div className="orders-empty-state">
+        <h3>
+          {totalOrders === 0
+            ? "No orders yet"
+            : hasActiveFilters
+              ? "No matching orders"
+              : "No orders available"}
+        </h3>
+        <p>
+          {totalOrders === 0
+            ? "Create the first order to start tracking customer tickets."
+            : hasActiveFilters
+              ? "Adjust search or status filters to reveal more orders."
+              : "Orders will appear here when they are available."}
+        </p>
+        <button type="button" className="orders-create-button" onClick={onCreate}>
+          Create Order
+        </button>
+      </div>
     );
   }
 
   return (
     <>
-      <div className="mobile-orders-list">
+      <div className="orders-mobile-list">
         {orders.map((order) => {
           const status = getOrderStatus(order.status);
 
           return (
             <article
               key={order.id}
-              className={`mobile-order-card ${editingOrderId === order.id ? "active" : ""}`}
+              className={`orders-mobile-card ${editingOrderId === order.id ? "active" : ""}`}
             >
-              <div className="mobile-order-card-top">
-                <div className="mobile-order-ident">
-                  <span className="mobile-order-id">#{order.id}</span>
+              <div className="orders-mobile-card-top">
+                <div className="orders-mobile-ident">
+                  <span className="orders-mobile-id">#{order.id}</span>
                   <div>
                     <strong>{order.customer_name || "Walk-in Guest"}</strong>
                     <span>{formatDate(order.created_at)}</span>
                   </div>
                 </div>
 
-                <span className={`status-badge status-${status}`}>
+                <span className={`orders-status orders-status-${status}`}>
                   {statusLabels[status]}
                 </span>
               </div>
 
-              <div className="mobile-order-card-bottom">
-                <div className="mobile-order-amount">
+              <div className="orders-mobile-card-bottom">
+                <div className="orders-mobile-amount">
                   <span>Amount</span>
                   <strong>{formatCurrency(order.total_price)}</strong>
                 </div>
 
-                <div className="table-actions">
+                <div className="orders-actions">
                   <button
                     type="button"
-                    className="table-action-button"
+                    className="orders-action-button"
                     onClick={() => onEdit(order)}
                     disabled={isBusy}
                   >
@@ -71,7 +97,15 @@ function OrdersTable({
                   </button>
                   <button
                     type="button"
-                    className="table-action-button danger-button"
+                    className="orders-action-button"
+                    onClick={() => onEdit(order)}
+                    disabled={isBusy}
+                  >
+                    Update Status
+                  </button>
+                  <button
+                    type="button"
+                    className="orders-action-button danger"
                     onClick={() => onDelete(order.id)}
                     disabled={isBusy}
                   >
@@ -84,16 +118,16 @@ function OrdersTable({
         })}
       </div>
 
-      <div className="table-wrapper desktop-orders-table">
+      <div className="orders-table-wrap">
         <table className="orders-table">
           <thead>
             <tr>
-              <th>Order ID</th>
-              <th>Customer</th>
-              <th>Status</th>
-              <th>Amount</th>
-              <th>Date</th>
-              <th>Actions</th>
+              <th className="orders-cell">Order ID</th>
+              <th className="orders-cell">Customer Name</th>
+              <th className="orders-cell">Total Price</th>
+              <th className="orders-cell">Status</th>
+              <th className="orders-cell">Date</th>
+              <th className="orders-cell orders-cell-actions">Actions</th>
             </tr>
           </thead>
 
@@ -104,22 +138,22 @@ function OrdersTable({
               return (
                 <tr
                   key={order.id}
-                  className={editingOrderId === order.id ? "table-row-active" : ""}
+                  className={`orders-row ${editingOrderId === order.id ? "active" : ""}`}
                 >
-                  <td>#{order.id}</td>
-                  <td>{order.customer_name || "Walk-in Guest"}</td>
-                  <td>
-                    <span className={`status-badge status-${status}`}>
+                  <td className="orders-cell">#{order.id}</td>
+                  <td className="orders-cell">{order.customer_name || "Walk-in Guest"}</td>
+                  <td className="orders-cell">{formatCurrency(order.total_price)}</td>
+                  <td className="orders-cell">
+                    <span className={`orders-status orders-status-${status}`}>
                       {statusLabels[status]}
                     </span>
                   </td>
-                  <td>{formatCurrency(order.total_price)}</td>
-                  <td>{formatDate(order.created_at)}</td>
-                  <td>
-                    <div className="table-actions">
+                  <td className="orders-cell">{formatDate(order.created_at)}</td>
+                  <td className="orders-cell">
+                    <div className="orders-actions">
                       <button
                         type="button"
-                        className="table-action-button"
+                        className="orders-action-button"
                         onClick={() => onEdit(order)}
                         disabled={isBusy}
                       >
@@ -127,7 +161,15 @@ function OrdersTable({
                       </button>
                       <button
                         type="button"
-                        className="table-action-button danger-button"
+                        className="orders-action-button"
+                        onClick={() => onEdit(order)}
+                        disabled={isBusy}
+                      >
+                        Update Status
+                      </button>
+                      <button
+                        type="button"
+                        className="orders-action-button danger"
                         onClick={() => onDelete(order.id)}
                         disabled={isBusy}
                       >
