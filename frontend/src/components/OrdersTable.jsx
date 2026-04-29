@@ -27,7 +27,9 @@ function OrdersTable({
   editingOrderId,
   isBusy,
   isLoading,
+  deletingOrderId,
   onEdit,
+  onDelete,
   onCreate,
   onView,
   onUpdateStatus,
@@ -95,6 +97,15 @@ function OrdersTable({
         disabled={isBusy}
       >
         Edit
+      </button>
+      <button
+        type="button"
+        className="orders-action-button orders-delete-button"
+        onClick={() => onDelete?.(order.id)}
+        disabled={isBusy || deletingOrderId === order.id || !onDelete}
+      >
+        <AppIcon name="delete" size={14} />
+        <span className="sr-only">Delete</span>
       </button>
       <button
         type="button"

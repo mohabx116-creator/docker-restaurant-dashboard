@@ -20,8 +20,7 @@ function CartDrawer({
     (sum, item) => sum + Number(item.subtotal ?? Number(item.price) * item.quantity),
     0
   );
-  const serviceTax = subtotal * 0.05;
-  const total = subtotal + serviceTax;
+  const total = subtotal;
 
   if (!isOpen) return null;
 
@@ -121,10 +120,6 @@ function CartDrawer({
           <div>
             <span>Subtotal</span>
             <strong>{formatCurrency(subtotal)}</strong>
-          </div>
-          <div>
-            <span>Service Tax (5%)</span>
-            <strong>{formatCurrency(serviceTax)}</strong>
           </div>
           <div>
             <span>Delivery Fee</span>

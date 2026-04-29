@@ -1,11 +1,14 @@
 import AppIcon from "./AppIcon";
 import Logo from "./Logo";
 
-const NAV_ITEMS = [
+const PRIMARY_NAV_ITEMS = [
   { id: "overview", label: "Dashboard", icon: "dashboard" },
   { id: "orders", label: "Orders", icon: "orders" },
   { id: "products", label: "Menu", icon: "menu" },
   { id: "analytics", label: "Analytics", icon: "analytics" },
+];
+
+const UTILITY_NAV_ITEMS = [
   { id: "settings", label: "Settings", icon: "settings" },
   { id: "support", page: "settings", label: "Support", icon: "support" },
 ];
@@ -15,8 +18,30 @@ function Sidebar({
   onPageChange,
   isMobileOpen,
   onClose,
-  onLogout,
 }) {
+  const renderNavButton = (item) => {
+    const targetPage = item.page || item.id;
+    const isActive = activePage === targetPage && item.id !== "support";
+
+    return (
+      <button
+        key={item.id}
+        type="button"
+        className={isActive ? "active" : ""}
+        onClick={() => {
+          onPageChange(targetPage);
+          onClose?.();
+        }}
+        aria-current={isActive ? "page" : undefined}
+      >
+        <span className="sidebar-nav-icon">
+          <AppIcon name={item.icon} size={18} />
+        </span>
+        <span>{item.label}</span>
+      </button>
+    );
+  };
+
   return (
     <aside className={`sidebar-shell ${isMobileOpen ? "mobile-open" : ""}`}>
       <div className="sidebar-header">
@@ -37,31 +62,12 @@ function Sidebar({
       </div>
 
       <nav className="sidebar-nav">
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={activePage === item.id ? "active" : ""}
-            onClick={() => {
-              onPageChange(item.page || item.id);
-              onClose?.();
-            }}
-            aria-current={activePage === item.id ? "page" : undefined}
-          >
-            <span className="sidebar-nav-icon">
-              <AppIcon name={item.icon} size={18} />
-            </span>
-            <span>{item.label}</span>
-          </button>
-        ))}
+        {PRIMARY_NAV_ITEMS.map(renderNavButton)}
       </nav>
 
-      <div className="sidebar-footer">
-        <button type="button" className="sidebar-logout-button" onClick={onLogout}>
-          <AppIcon name="logout" size={18} />
-          <span>Support</span>
-        </button>
-      </div>
+      <nav className="sidebar-footer" aria-label="Secondary navigation">
+        {UTILITY_NAV_ITEMS.map(renderNavButton)}
+      </nav>
     </aside>
   );
 }

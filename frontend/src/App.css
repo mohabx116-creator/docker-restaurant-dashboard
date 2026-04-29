@@ -6088,6 +6088,7 @@ body,
 }
 
 .sidebar-nav button,
+.sidebar-footer button,
 .sidebar-logout-button {
   min-height: 44px;
   padding: 0 12px;
@@ -6103,7 +6104,8 @@ body,
   font-weight: 650;
 }
 
-.sidebar-nav button.active {
+.sidebar-nav button.active,
+.sidebar-footer button.active {
   border-color: rgba(255, 255, 255, 0.92);
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
@@ -6118,6 +6120,8 @@ body,
   margin-inline: -16px;
   padding: 18px 16px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: grid;
+  gap: 8px;
 }
 
 .sidebar-logout-button {
@@ -6404,6 +6408,18 @@ body,
   border-radius: 999px;
   background: #dfe5ff;
   color: var(--figma-primary);
+  flex: 0 0 auto;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.popular-list-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .widget-link-button {
@@ -6519,6 +6535,14 @@ body,
 .orders-more-button {
   font-size: 18px;
   letter-spacing: 2px;
+}
+
+.orders-delete-button {
+  color: #ef233c;
+}
+
+.orders-delete-button span:not(.sr-only) {
+  display: none;
 }
 
 .orders-page .orders-content-grid {
@@ -6942,6 +6966,7 @@ body,
     position: fixed;
     z-index: 60;
     transform: translateX(-104%);
+    transition: transform 0.2s ease;
   }
 
   .sidebar-shell.mobile-open {

@@ -1283,12 +1283,6 @@ function App() {
     (order) => getOrderStatus(order.status) === "preparing"
   ).length;
   const uniqueCustomers = customersData.length;
-  const highestOrderValue =
-    totalOrders > 0
-      ? Math.max(
-        ...sortedFilteredOrders.map((order) => Number(order.total_price || 0))
-      )
-      : 0;
   const completionRate =
     totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0;
   const liveAttentionCount = pendingOrders + preparingOrders;
@@ -1316,9 +1310,6 @@ function App() {
   });
   const maxHourlyOrders = Math.max(1, ...hourlyChartData.map((item) => item.orders));
   const recentOrders = sortedFilteredOrders.slice(0, 5);
-  const highestOrders = [...sortedFilteredOrders]
-    .sort((a, b) => Number(b.total_price) - Number(a.total_price))
-    .slice(0, 5);
   const repeatLeader = [...customersData].sort(
     (a, b) => b.totalOrders - a.totalOrders || b.totalRevenue - a.totalRevenue
   )[0] || null;
@@ -1399,12 +1390,12 @@ function App() {
       description: "Protected orders currently in scope.",
     },
     {
-      icon: "AV",
-      label: "Average Order",
-      value: formatCurrency(averageOrder),
-      badge: `${uniqueCustomers || 0} customers`,
-      tone: "info",
-      description: "Average ticket value across visible orders.",
+      icon: "PN",
+      label: "Pending Orders",
+      value: pendingOrders,
+      badge: totalOrders ? `${Math.round((pendingOrders / totalOrders) * 100)}% open` : "0% open",
+      tone: "warm",
+      description: "Waiting for kitchen action.",
     },
     {
       icon: "CM",
@@ -1413,41 +1404,6 @@ function App() {
       badge: `${completionRate}% closed`,
       tone: "success",
       description: "Orders completed successfully by the kitchen team.",
-    },
-  ];
-
-  const secondaryKpis = [
-    {
-      icon: "PN",
-      label: "Pending Orders",
-      value: pendingOrders,
-      badge: totalOrders ? `${Math.round((pendingOrders / totalOrders) * 100)}%` : "0%",
-      tone: "warm",
-      description: "Waiting for kitchen action.",
-    },
-    {
-      icon: "PR",
-      label: "Preparing Orders",
-      value: preparingOrders,
-      badge: totalOrders ? `${Math.round((preparingOrders / totalOrders) * 100)}%` : "0%",
-      tone: "info",
-      description: "In active preparation.",
-    },
-    {
-      icon: "CU",
-      label: "Active Customers",
-      value: uniqueCustomers,
-      badge: topCustomer ? topCustomer.name : "Awaiting orders",
-      tone: "neutral",
-      description: "Unique customers in the current order view.",
-    },
-    {
-      icon: "MX",
-      label: "Highest Order",
-      value: formatCurrency(highestOrderValue),
-      badge: topCustomer ? "Top customer live" : "No leader yet",
-      tone: "success",
-      description: "Highest order in the visible dataset.",
     },
   ];
 
@@ -1895,7 +1851,7 @@ function App() {
                     : sortedFilteredOrders.length === 0
               }
             >
-              {isCartPage ? "Browse Menu" : isProductsPage ? "Export Menu" : "Export Snapshot"}
+              {isCartPage ? "Browse Menu" : isProductsPage ? "Export Menu" : "Export CSV"}
             </button>
 
             <button
@@ -1945,13 +1901,17 @@ function App() {
           <div className="panel-card">
             <div className="panel-header">
               <div>
-                <h2>Revenue Performance</h2>
+                <h2>Revenue &amp; Volume</h2>
                 <p>
                   Grouped customer revenue from the live protected order set in
                   the current dashboard view.
                 </p>
               </div>
-              <span className="panel-chip">Revenue by customer</span>
+              <div className="analytics-segmented">
+                <button type="button" className="active">Daily</button>
+                <button type="button">Weekly</button>
+                <button type="button">Monthly</button>
+              </div>
             </div>
 
             <AnalyticsChart
@@ -1983,12 +1943,16 @@ function App() {
                   <div className="popular-list-row" key={product.product_id}>
                     <div className="popular-list-user">
                       <span className="popular-list-avatar">
-                        {product.name
-                          .split(" ")
-                          .filter(Boolean)
-                          .slice(0, 2)
-                          .map((part) => part[0]?.toUpperCase())
-                          .join("") || "RD"}
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} />
+                        ) : (
+                          product.name
+                            .split(" ")
+                            .filter(Boolean)
+                            .slice(0, 2)
+                            .map((part) => part[0]?.toUpperCase())
+                            .join("") || "RD"
+                        )}
                       </span>
                       <div>
                         <strong>{product.name}</strong>
