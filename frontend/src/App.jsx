@@ -11,6 +11,8 @@ import ProductsGrid from "./components/ProductsGrid";
 import ProductModal from "./components/ProductModal";
 import ToastStack from "./components/ToastStack";
 import ConfirmDialog from "./components/ConfirmDialog";
+import CartDrawer from "./components/CartDrawer";
+import Logo from "./components/Logo";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -617,6 +619,15 @@ function App() {
     setCartItems([]);
     setIsCartOpen(false);
     setCartCustomerName("");
+  };
+
+  const openCartExperience = () => {
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      setActivePage("cart");
+      return;
+    }
+
+    setIsCartOpen(true);
   };
 
   const handleSubmitOrder = async (event) => {
@@ -2373,12 +2384,7 @@ function App() {
         <section className="auth-shell">
           <div className="auth-brand-panel">
             <div className="auth-brand">
-              <div className="brand-mark auth-brand-mark" aria-hidden="true">
-                <span />
-              </div>
-              <div>
-                <strong>RestoDash Lite</strong>
-              </div>
+              <Logo variant="light" />
             </div>
 
             <div className="auth-brand-copy">
@@ -2403,13 +2409,7 @@ function App() {
 
           <section className="auth-card">
             <div className="auth-mobile-brand">
-              <div className="brand-mark auth-brand-mark" aria-hidden="true">
-                <span />
-              </div>
-              <div>
-                <strong>RestoDash Lite</strong>
-                <span>Dashboard Lite</span>
-              </div>
+              <Logo />
             </div>
 
             <div className="auth-header">
@@ -2614,6 +2614,8 @@ function App() {
                 setIsMobileSidebarOpen((currentValue) => !currentValue)
               }
               isMobileSidebarOpen={isMobileSidebarOpen}
+              cartItemsCount={getCartItemsCount()}
+              onCartClick={openCartExperience}
             />
 
             {ordersError && activePage !== "products" && (
@@ -2631,6 +2633,21 @@ function App() {
           cartItemsCount={getCartItemsCount()}
         />
       </div>
+
+      <CartDrawer
+        isOpen={isCartOpen}
+        cartItems={cartItems}
+        customerName={cartCustomerName}
+        isCheckingOut={isCheckingOut}
+        onCustomerNameChange={setCartCustomerName}
+        onClose={() => setIsCartOpen(false)}
+        onIncrease={increaseCartItem}
+        onDecrease={decreaseCartItem}
+        onRemove={removeCartItem}
+        onClear={clearCart}
+        onCheckout={handleCheckoutCart}
+        formatCurrency={formatCurrency}
+      />
 
       <ProductModal
         isOpen={productFormOpen}

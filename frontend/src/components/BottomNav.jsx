@@ -1,10 +1,12 @@
+import AppIcon from "./AppIcon";
+
 const NAV_ITEMS = [
-  { id: "overview", label: "Home", short: "HM" },
-  { id: "products", label: "Menu", short: "MN" },
-  { id: "cart", label: "Cart", short: "CT", hasBadge: true },
-  { id: "orders", label: "Orders", short: "OR" },
-  { id: "analytics", label: "Analytics", short: "AN" },
-  { id: "settings", label: "Settings", short: "ST" },
+  { id: "overview", label: "Home", icon: "overview" },
+  { id: "products", label: "Menu", icon: "products" },
+  { id: "cart", label: "Cart", icon: "cart", hasBadge: true },
+  { id: "orders", label: "Orders", icon: "orders" },
+  { id: "analytics", label: "Analytics", icon: "analytics" },
+  { id: "settings", label: "Settings", icon: "settings" },
 ];
 
 function BottomNav({ activePage, onPageChange, onPrimaryAction, cartItemsCount = 0 }) {
@@ -19,7 +21,7 @@ function BottomNav({ activePage, onPageChange, onPrimaryAction, cartItemsCount =
           aria-label="Create item"
           onClick={onPrimaryAction}
         >
-          +
+          <AppIcon name="add" size={24} />
         </button>
       )}
 
@@ -33,7 +35,7 @@ function BottomNav({ activePage, onPageChange, onPrimaryAction, cartItemsCount =
             aria-current={activePage === item.id ? "page" : undefined}
           >
             <span className="bottom-nav-icon">
-              {item.short}
+              <AppIcon name={item.icon} size={18} />
               {item.hasBadge && cartItemsCount > 0 && (
                 <span className="bottom-cart-badge">{cartItemsCount}</span>
               )}

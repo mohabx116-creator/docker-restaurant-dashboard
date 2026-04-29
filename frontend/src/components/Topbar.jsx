@@ -1,3 +1,6 @@
+import AppIcon from "./AppIcon";
+import BrandMark from "./BrandMark";
+
 const getInitials = (name = "") =>
   name
     .split(" ")
@@ -16,6 +19,8 @@ function Topbar({
   isBusy,
   onToggleSidebar,
   isMobileSidebarOpen,
+  cartItemsCount = 0,
+  onCartClick,
 }) {
   const searchPlaceholder =
     pageTitle === "Products"
@@ -36,11 +41,14 @@ function Topbar({
           aria-label={isMobileSidebarOpen ? "Close navigation" : "Open navigation"}
           aria-expanded={isMobileSidebarOpen}
         >
-          {isMobileSidebarOpen ? "Close" : "Menu"}
+          <AppIcon name={isMobileSidebarOpen ? "close" : "dashboard"} size={18} />
+          <span>{isMobileSidebarOpen ? "Close" : "Menu"}</span>
         </button>
 
         <div className="topbar-mobile-brand">
-          <div className="topbar-avatar">{getInitials(currentUser?.name)}</div>
+          <div className="topbar-avatar topbar-brand-mark">
+            <BrandMark />
+          </div>
           <div>
             <strong>RestoDash Lite</strong>
             <span>{pageTitle}</span>
@@ -52,7 +60,9 @@ function Topbar({
         <span className="topbar-page-pill">{pageTitle}</span>
 
         <label className="topbar-search">
-          <span className="topbar-search-icon">Search</span>
+          <span className="topbar-search-icon">
+            <AppIcon name="search" size={17} />
+          </span>
           <span className="sr-only">Search</span>
           <input
             type="search"
@@ -64,13 +74,23 @@ function Topbar({
       </div>
 
       <div className="topbar-actions">
+        <button
+          type="button"
+          className="icon-button topbar-cart-button"
+          aria-label="Open cart"
+          onClick={onCartClick}
+        >
+          <AppIcon name="cart" size={18} />
+          {cartItemsCount > 0 && <small>{cartItemsCount}</small>}
+        </button>
+
         <button type="button" className="icon-button" aria-label="Notifications">
-          <span>NT</span>
+          <AppIcon name="notification" size={18} />
           <small>{notificationCount}</small>
         </button>
 
         <button type="button" className="icon-button" aria-label="Help">
-          <span>HP</span>
+          <AppIcon name="settings" size={18} />
         </button>
 
         <div className="topbar-user">
@@ -87,7 +107,8 @@ function Topbar({
           onClick={onLogout}
           disabled={isBusy}
         >
-          Logout
+          <AppIcon name="logout" size={17} />
+          <span>Logout</span>
         </button>
       </div>
     </header>

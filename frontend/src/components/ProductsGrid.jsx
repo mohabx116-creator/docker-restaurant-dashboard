@@ -1,3 +1,6 @@
+import AppIcon from "./AppIcon";
+import Watermark from "./Watermark";
+
 function ProductSkeletonCard() {
   return (
     <article className="product-card product-card-skeleton" aria-hidden="true">
@@ -50,6 +53,7 @@ function ProductsGrid({
   if (error && products.length === 0) {
     return (
       <section className="products-feedback-card">
+        <Watermark />
         <span className="feedback-eyebrow">Products error</span>
         <h3>Unable to load menu items</h3>
         <p>{error}</p>
@@ -63,6 +67,7 @@ function ProductsGrid({
   if (products.length === 0) {
     return (
       <section className="products-feedback-card">
+        <Watermark />
         <span className="feedback-eyebrow">No products</span>
         <h3>No menu items match the current view</h3>
         <p>
@@ -92,6 +97,7 @@ function ProductsGrid({
 
               <div className="product-card-badge-row">
                 <span className="product-category-badge">{product.category}</span>
+                <span className="product-price-badge">{formatCurrency(product.price)}</span>
                 <span
                   className={`status-badge ${product.is_available ? "status-completed" : "status-cancelled"
                     }`}
@@ -107,7 +113,6 @@ function ProductsGrid({
                   <h3>{product.name}</h3>
                   <p className="product-card-description">{product.description}</p>
                 </div>
-                <strong>{formatCurrency(product.price)}</strong>
               </div>
 
               <button
@@ -121,6 +126,7 @@ function ProductsGrid({
                   Boolean(togglingProductId)
                 }
               >
+                <AppIcon name="cart" size={18} />
                 {cartQuantity > 0 ? `Add More (${cartQuantity})` : "Add to Cart"}
               </button>
 
@@ -132,7 +138,8 @@ function ProductsGrid({
                     onClick={() => onEdit(product)}
                     disabled={Boolean(deletingProductId) || Boolean(togglingProductId)}
                   >
-                    Edit
+                    <AppIcon name="edit" size={16} />
+                    <span>Edit</span>
                   </button>
                   <button
                     type="button"
@@ -140,6 +147,7 @@ function ProductsGrid({
                     onClick={() => onDelete(product)}
                     disabled={Boolean(deletingProductId) || Boolean(togglingProductId)}
                   >
+                    <AppIcon name="delete" size={16} />
                     {isDeleting ? "Deleting..." : "Delete"}
                   </button>
                 </div>

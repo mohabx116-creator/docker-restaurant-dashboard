@@ -1,3 +1,6 @@
+import AppIcon from "./AppIcon";
+import Logo from "./Logo";
+
 const getInitials = (name = "") =>
   name
     .split(" ")
@@ -7,13 +10,13 @@ const getInitials = (name = "") =>
     .join("") || "RD";
 
 const NAV_ITEMS = [
-  { id: "overview", label: "Overview", symbol: "OV" },
-  { id: "products", label: "Products / Menu", symbol: "MN" },
-  { id: "cart", label: "Order Cart", symbol: "CT", hasBadge: true },
-  { id: "orders", label: "Orders", symbol: "OR" },
-  { id: "analytics", label: "Analytics", symbol: "AN" },
-  { id: "customers", label: "Customers", symbol: "CU" },
-  { id: "settings", label: "Settings", symbol: "ST" },
+  { id: "overview", label: "Overview", icon: "overview" },
+  { id: "products", label: "Products / Menu", icon: "products" },
+  { id: "cart", label: "Order Cart", icon: "cart", hasBadge: true },
+  { id: "orders", label: "Orders", icon: "orders" },
+  { id: "analytics", label: "Analytics", icon: "analytics" },
+  { id: "customers", label: "Customers", icon: "customers" },
+  { id: "settings", label: "Settings", icon: "settings" },
 ];
 
 function Sidebar({
@@ -31,11 +34,7 @@ function Sidebar({
     <aside className={`sidebar-shell ${isMobileOpen ? "mobile-open" : ""}`}>
       <div className="sidebar-header">
         <div className="sidebar-brand">
-          <div className="brand-mark">RD</div>
-          <div className="sidebar-brand-copy">
-            <strong>RestoDash Lite</strong>
-            <span>Premium Operations</span>
-          </div>
+          <Logo variant="light" className="sidebar-logo" />
         </div>
 
         <button
@@ -44,7 +43,8 @@ function Sidebar({
           onClick={onClose}
           aria-label="Close navigation"
         >
-          Close
+          <AppIcon name="close" size={18} />
+          <span>Close</span>
         </button>
       </div>
 
@@ -64,7 +64,9 @@ function Sidebar({
             }}
             aria-current={activePage === item.id ? "page" : undefined}
           >
-            <span className="sidebar-nav-icon">{item.symbol}</span>
+            <span className="sidebar-nav-icon">
+              <AppIcon name={item.icon} size={18} />
+            </span>
             <span>{item.label}</span>
 
             {item.hasBadge && cartItemsCount > 0 && (
@@ -95,7 +97,8 @@ function Sidebar({
         </div>
 
         <button type="button" className="sidebar-logout-button" onClick={onLogout}>
-          Logout
+          <AppIcon name="logout" size={18} />
+          <span>Logout</span>
         </button>
       </div>
     </aside>
