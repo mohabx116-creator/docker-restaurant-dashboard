@@ -96,14 +96,7 @@ function ProductsGrid({
               />
 
               <div className="product-card-badge-row">
-                <span className="product-category-badge">{product.category}</span>
                 <span className="product-price-badge">{formatCurrency(product.price)}</span>
-                <span
-                  className={`status-badge ${product.is_available ? "status-completed" : "status-cancelled"
-                    }`}
-                >
-                  {product.is_available ? "Available" : "Out of Stock"}
-                </span>
               </div>
             </div>
 
@@ -111,24 +104,19 @@ function ProductsGrid({
               <div className="product-card-header">
                 <div>
                   <h3>{product.name}</h3>
+                  <span
+                    className={`product-tag-badge ${product.is_available ? "" : "danger"}`}
+                  >
+                    {product.is_available ? product.tag || product.category : "Out of Stock"}
+                  </span>
                   <p className="product-card-description">{product.description}</p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="add-to-cart-button"
-                onClick={() => onAddToCart(product)}
-                disabled={
-                  !product.is_available ||
-                  isCartBusy ||
-                  Boolean(deletingProductId) ||
-                  Boolean(togglingProductId)
-                }
-              >
-                <AppIcon name="cart" size={18} />
-                {cartQuantity > 0 ? `Add More (${cartQuantity})` : "Add to Cart"}
-              </button>
+              <div className="product-card-meta-row">
+                <span>★ {Number(product.rating || 4.8).toFixed(1)}</span>
+                <span>({Number(product.reviews_count || 0)} reviews)</span>
+              </div>
 
               <div className="product-card-footer">
                 <div className="product-card-actions">
@@ -161,6 +149,22 @@ function ProductsGrid({
                 >
                   <span>{isToggling ? "..." : product.is_available ? "On" : "Off"}</span>
                   <span className="availability-toggle-knob" aria-hidden="true"></span>
+                </button>
+
+                <button
+                  type="button"
+                  className="add-to-cart-button"
+                  onClick={() => onAddToCart(product)}
+                  disabled={
+                    !product.is_available ||
+                    isCartBusy ||
+                    Boolean(deletingProductId) ||
+                    Boolean(togglingProductId)
+                  }
+                  aria-label={`Add ${product.name} to cart`}
+                >
+                  <AppIcon name="cart" size={18} />
+                  {cartQuantity > 0 && <span>{cartQuantity}</span>}
                 </button>
               </div>
             </div>

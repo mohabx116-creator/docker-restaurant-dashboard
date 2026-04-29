@@ -303,6 +303,17 @@ async function initDB() {
     await pool.query(
         "UPDATE products SET is_available = true WHERE is_available IS NULL"
     );
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS tag TEXT");
+    await pool.query(
+        "ALTER TABLE products ADD COLUMN IF NOT EXISTS rating NUMERIC DEFAULT 4.8"
+    );
+    await pool.query(
+        "ALTER TABLE products ADD COLUMN IF NOT EXISTS reviews_count INTEGER DEFAULT 0"
+    );
+    await pool.query("ALTER TABLE products ALTER COLUMN rating SET DEFAULT 4.8");
+    await pool.query("ALTER TABLE products ALTER COLUMN reviews_count SET DEFAULT 0");
+    await pool.query("UPDATE products SET rating = 4.8 WHERE rating IS NULL");
+    await pool.query("UPDATE products SET reviews_count = 0 WHERE reviews_count IS NULL");
 
     await pool.query("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS quantity INTEGER");
     await pool.query("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS unit_price NUMERIC");
@@ -325,6 +336,38 @@ async function initDB() {
     await pool.query(
         "CREATE UNIQUE INDEX IF NOT EXISTS carts_one_active_per_user ON carts(user_id) WHERE status = 'active'"
     );
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS restaurant_settings (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+            first_name TEXT,
+            last_name TEXT,
+            phone_number TEXT,
+            restaurant_name TEXT,
+            address TEXT,
+            cuisine_type TEXT,
+            seating_capacity INTEGER,
+            new_order_alerts BOOLEAN DEFAULT true,
+            low_stock_warnings BOOLEAN DEFAULT true,
+            daily_reports BOOLEAN DEFAULT false,
+            customer_reviews BOOLEAN DEFAULT true,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+    await pool.query("ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS first_name TEXT");
+    await pool.query("ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS last_name TEXT");
+    await pool.query("ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS phone_number TEXT");
+    await pool.query("ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS restaurant_name TEXT");
+    await pool.query("ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS address TEXT");
+    await pool.query("ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS cuisine_type TEXT");
+    await pool.query("ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS seating_capacity INTEGER");
+    await pool.query("ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS new_order_alerts BOOLEAN DEFAULT true");
+    await pool.query("ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS low_stock_warnings BOOLEAN DEFAULT true");
+    await pool.query("ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS daily_reports BOOLEAN DEFAULT false");
+    await pool.query("ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS customer_reviews BOOLEAN DEFAULT true");
+    await pool.query("ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
 
     await seedProductsIfEmpty();
 
@@ -408,6 +451,40 @@ app.post("/auth/login", async (req, res) => {
             email: user.email,
         },
     });
+});
+
+app.patch("/auth/password", authenticateToken, async (req, res) => {
+    const currentPassword = String(req.body.current_password || "");
+    const newPassword = String(req.body.new_password || "");
+
+    if (!currentPassword || newPassword.length < 6) {
+        return res.status(400).json({
+            message: "Current password and a new password of at least 6 characters are required.",
+        });
+    }
+
+    const userResult = await pool.query("SELECT id, password FROM users WHERE id = $1", [
+        req.user.id,
+    ]);
+
+    if (userResult.rows.length === 0) {
+        return res.status(404).json({ message: "User not found." });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, userResult.rows[0].password);
+
+    if (!isMatch) {
+        return res.status(400).json({ message: "Current password is incorrect." });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await pool.query("UPDATE users SET password = $1 WHERE id = $2", [
+        hashedPassword,
+        req.user.id,
+    ]);
+
+    res.json({ message: "Password updated successfully." });
 });
 
 app.post("/orders", authenticateToken, async (req, res) => {
@@ -659,7 +736,22 @@ app.get("/orders", authenticateToken, async (req, res) => {
     }
 
     const result = await pool.query(
-        `SELECT * FROM orders WHERE ${conditions.join(" AND ")} ORDER BY id DESC`,
+        `SELECT
+            o.*,
+            COALESCE(SUM(oi.quantity), 0)::int AS items_count,
+            COALESCE(
+                STRING_AGG(
+                    CONCAT(oi.quantity, 'x ', p.name),
+                    ', ' ORDER BY oi.id
+                ),
+                ''
+            ) AS items_summary
+         FROM orders o
+         LEFT JOIN order_items oi ON oi.order_id = o.id
+         LEFT JOIN products p ON p.id = oi.product_id
+         WHERE ${conditions.map((condition) => condition.replace(/\bid\b/g, "o.id").replace(/\bstatus\b/g, "o.status").replace(/\bcustomer_name\b/g, "o.customer_name").replace(/\buser_id\b/g, "o.user_id")).join(" AND ")}
+         GROUP BY o.id
+         ORDER BY o.id DESC`,
         params
     );
 
@@ -821,6 +913,18 @@ app.get("/analytics/overview", authenticateToken, async (req, res) => {
         [req.user.id]
     );
 
+    const hourlyOrdersResult = await pool.query(
+        `SELECT
+            EXTRACT(HOUR FROM created_at)::int AS hour,
+            COUNT(*)::int AS orders,
+            COALESCE(SUM(total_price), 0)::numeric AS revenue
+         FROM orders
+         WHERE user_id = $1
+         GROUP BY EXTRACT(HOUR FROM created_at)
+         ORDER BY hour ASC`,
+        [req.user.id]
+    );
+
     const summary = summaryResult.rows[0];
 
     res.json({
@@ -846,7 +950,133 @@ app.get("/analytics/overview", authenticateToken, async (req, res) => {
             total_quantity: Number(item.total_quantity),
             total_revenue: Number(item.total_revenue),
         })),
+        hourly_orders: hourlyOrdersResult.rows.map((item) => ({
+            hour: Number(item.hour),
+            orders: Number(item.orders),
+            revenue: Number(item.revenue),
+        })),
     });
+});
+
+app.get("/analytics/popular-products", authenticateToken, async (req, res) => {
+    const result = await pool.query(
+        `SELECT
+            p.id AS product_id,
+            p.name,
+            p.category,
+            p.image_url,
+            SUM(oi.quantity)::int AS total_quantity,
+            COALESCE(SUM(oi.quantity * oi.unit_price), 0)::numeric AS total_revenue
+         FROM order_items oi
+         JOIN orders o ON o.id = oi.order_id
+         JOIN products p ON p.id = oi.product_id
+         WHERE o.user_id = $1
+         GROUP BY p.id, p.name, p.category, p.image_url
+         ORDER BY total_quantity DESC, total_revenue DESC
+         LIMIT 10`,
+        [req.user.id]
+    );
+
+    res.json(
+        result.rows.map((item) => ({
+            ...item,
+            total_quantity: Number(item.total_quantity),
+            total_revenue: Number(item.total_revenue),
+        }))
+    );
+});
+
+app.get("/settings", authenticateToken, async (req, res) => {
+    const userResult = await pool.query("SELECT name, email FROM users WHERE id = $1", [
+        req.user.id,
+    ]);
+    const user = userResult.rows[0] || {};
+    const nameParts = String(user.name || "").split(" ").filter(Boolean);
+
+    const result = await pool.query(
+        `INSERT INTO restaurant_settings (
+            user_id,
+            first_name,
+            last_name,
+            restaurant_name,
+            new_order_alerts,
+            low_stock_warnings,
+            daily_reports,
+            customer_reviews
+         )
+         VALUES ($1, $2, $3, 'RestoDash Lite', true, true, false, true)
+         ON CONFLICT (user_id) DO NOTHING
+         RETURNING *`,
+        [req.user.id, nameParts[0] || "", nameParts.slice(1).join(" ")]
+    );
+
+    const settingsResult =
+        result.rows.length > 0
+            ? result
+            : await pool.query("SELECT * FROM restaurant_settings WHERE user_id = $1", [
+                req.user.id,
+            ]);
+
+    res.json({
+        ...settingsResult.rows[0],
+        email: user.email || "",
+    });
+});
+
+app.put("/settings", authenticateToken, async (req, res) => {
+    const toBoolean = (value, fallback) =>
+        typeof value === "boolean" ? value : fallback;
+    const seatingCapacity = Number(req.body.seating_capacity);
+
+    const result = await pool.query(
+        `INSERT INTO restaurant_settings (
+            user_id,
+            first_name,
+            last_name,
+            phone_number,
+            restaurant_name,
+            address,
+            cuisine_type,
+            seating_capacity,
+            new_order_alerts,
+            low_stock_warnings,
+            daily_reports,
+            customer_reviews,
+            updated_at
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
+         ON CONFLICT (user_id)
+         DO UPDATE SET
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            phone_number = EXCLUDED.phone_number,
+            restaurant_name = EXCLUDED.restaurant_name,
+            address = EXCLUDED.address,
+            cuisine_type = EXCLUDED.cuisine_type,
+            seating_capacity = EXCLUDED.seating_capacity,
+            new_order_alerts = EXCLUDED.new_order_alerts,
+            low_stock_warnings = EXCLUDED.low_stock_warnings,
+            daily_reports = EXCLUDED.daily_reports,
+            customer_reviews = EXCLUDED.customer_reviews,
+            updated_at = CURRENT_TIMESTAMP
+         RETURNING *`,
+        [
+            req.user.id,
+            String(req.body.first_name || "").trim(),
+            String(req.body.last_name || "").trim(),
+            String(req.body.phone_number || "").trim(),
+            String(req.body.restaurant_name || "").trim(),
+            String(req.body.address || "").trim(),
+            String(req.body.cuisine_type || "").trim(),
+            Number.isFinite(seatingCapacity) ? seatingCapacity : null,
+            toBoolean(req.body.new_order_alerts, true),
+            toBoolean(req.body.low_stock_warnings, true),
+            toBoolean(req.body.daily_reports, false),
+            toBoolean(req.body.customer_reviews, true),
+        ]
+    );
+
+    res.json(result.rows[0]);
 });
 
 app.get("/products", authenticateToken, async (req, res) => {

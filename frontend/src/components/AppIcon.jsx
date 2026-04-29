@@ -82,7 +82,14 @@ const ICONS = {
       <line x1="5" y1="12" x2="19" y2="12" />
     </>
   ),
+  plus: (
+    <>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </>
+  ),
   remove: <line x1="5" y1="12" x2="19" y2="12" />,
+  minus: <line x1="5" y1="12" x2="19" y2="12" />,
   delete: (
     <>
       <polyline points="3 6 5 6 21 6" />
@@ -105,6 +112,12 @@ const ICONS = {
       <path d="M11 13h4" />
       <path d="M3 17l3 3 3-3" />
       <path d="M6 18V4" />
+    </>
+  ),
+  view: (
+    <>
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="3" />
     </>
   ),
   notification: (

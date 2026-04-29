@@ -143,6 +143,27 @@ const formatProductAvailability = (value) => (value ? "Available" : "Out of Stoc
 
 const getFallbackProductImage = () => "/products/smokehouse-royale-burger.jpg";
 
+const createDefaultSettingsForm = () => ({
+  first_name: "",
+  last_name: "",
+  email: "",
+  phone_number: "",
+  restaurant_name: "RestoDash Lite",
+  address: "",
+  cuisine_type: "",
+  seating_capacity: "",
+  new_order_alerts: true,
+  low_stock_warnings: true,
+  daily_reports: false,
+  customer_reviews: true,
+});
+
+const createDefaultPasswordForm = () => ({
+  current_password: "",
+  new_password: "",
+  confirm_password: "",
+});
+
 function App() {
   const toastIdRef = useRef(0);
   const [isRegister, setIsRegister] = useState(false);
@@ -209,6 +230,11 @@ function App() {
   const [selectedAvailability, setSelectedAvailability] = useState("all");
   const [ordersSortBy, setOrdersSortBy] = useState("newest");
   const [sortBy, setSortBy] = useState("name-asc");
+  const [settingsForm, setSettingsForm] = useState(createDefaultSettingsForm);
+  const [passwordForm, setPasswordForm] = useState(createDefaultPasswordForm);
+  const [isSettingsLoading, setIsSettingsLoading] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
 
   const addToast = (title, message, type = "info") => {
     toastIdRef.current += 1;
@@ -246,6 +272,8 @@ function App() {
     setConfirmDialog(null);
     setProductFormOpen(false);
     setCartCustomerName("");
+    setSettingsForm(createDefaultSettingsForm());
+    setPasswordForm(createDefaultPasswordForm());
     addToast("Session expired", "Session expired. Please login again.", "error");
   };
 
@@ -541,6 +569,101 @@ function App() {
     }
   };
 
+  const fetchSettings = async () => {
+    if (!token) return;
+
+    setIsSettingsLoading(true);
+
+    try {
+      const data = await apiRequest("/settings");
+      setSettingsForm({
+        ...createDefaultSettingsForm(),
+        ...data,
+        seating_capacity: data?.seating_capacity ? String(data.seating_capacity) : "",
+      });
+    } catch (error) {
+      addToast(
+        "Settings unavailable",
+        error instanceof Error ? error.message : "Failed to load settings",
+        "error"
+      );
+    } finally {
+      setIsSettingsLoading(false);
+    }
+  };
+
+  const handleSettingsChange = (field, value) => {
+    setSettingsForm((currentForm) => ({
+      ...currentForm,
+      [field]: value,
+    }));
+  };
+
+  const handleSaveSettings = async (event) => {
+    event.preventDefault();
+    setIsSavingSettings(true);
+
+    try {
+      const data = await apiRequest("/settings", {
+        method: "PUT",
+        body: {
+          ...settingsForm,
+          seating_capacity: settingsForm.seating_capacity
+            ? Number(settingsForm.seating_capacity)
+            : null,
+        },
+      });
+
+      setSettingsForm({
+        ...createDefaultSettingsForm(),
+        ...data,
+        email: settingsForm.email,
+        seating_capacity: data?.seating_capacity ? String(data.seating_capacity) : "",
+      });
+      addToast("Settings saved", "Restaurant settings were updated.", "success");
+    } catch (error) {
+      addToast(
+        "Save failed",
+        error instanceof Error ? error.message : "Failed to save settings",
+        "error"
+      );
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const handlePasswordChange = async (event) => {
+    event.preventDefault();
+
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      addToast("Password mismatch", "New password and confirmation do not match.", "error");
+      return;
+    }
+
+    setIsSavingPassword(true);
+
+    try {
+      await apiRequest("/auth/password", {
+        method: "PATCH",
+        body: {
+          current_password: passwordForm.current_password,
+          new_password: passwordForm.new_password,
+        },
+      });
+
+      setPasswordForm(createDefaultPasswordForm());
+      addToast("Password updated", "Your password was changed successfully.", "success");
+    } catch (error) {
+      addToast(
+        "Password update failed",
+        error instanceof Error ? error.message : "Failed to update password",
+        "error"
+      );
+    } finally {
+      setIsSavingPassword(false);
+    }
+  };
+
   useEffect(() => {
     if (!token) {
       return;
@@ -551,6 +674,7 @@ function App() {
       fetchProducts();
       fetchCart();
       fetchAnalyticsOverview();
+      fetchSettings();
     }, 0);
 
     return () => window.clearTimeout(loadTimer);
@@ -651,6 +775,8 @@ function App() {
     setAnalyticsOverview(null);
     setIsCartOpen(false);
     setCartCustomerName("");
+    setSettingsForm(createDefaultSettingsForm());
+    setPasswordForm(createDefaultPasswordForm());
   };
 
   const openCartExperience = () => {
@@ -1171,6 +1297,24 @@ function App() {
   const popularProducts = Array.isArray(analyticsOverview?.popular_products)
     ? analyticsOverview.popular_products
     : [];
+  const hourlyOrders = Array.isArray(analyticsOverview?.hourly_orders)
+    ? analyticsOverview.hourly_orders
+    : [];
+  const hourlyChartData = Array.from({ length: 12 }).map((_, index) => {
+    const hour = index + 9;
+    const match = hourlyOrders.find((item) => Number(item.hour) === hour);
+    return {
+      hour,
+      label:
+        hour === 12
+          ? "12pm"
+          : hour > 12
+            ? `${hour - 12}pm`
+            : `${hour}am`,
+      orders: match?.orders || 0,
+    };
+  });
+  const maxHourlyOrders = Math.max(1, ...hourlyChartData.map((item) => item.orders));
   const recentOrders = sortedFilteredOrders.slice(0, 5);
   const highestOrders = [...sortedFilteredOrders]
     .sort((a, b) => Number(b.total_price) - Number(a.total_price))
@@ -1307,6 +1451,41 @@ function App() {
     },
   ];
 
+  const analyticsKpis = [
+    {
+      icon: "$",
+      label: "Total Sales",
+      value: formatCurrency(analyticsOverview?.total_revenue ?? totalRevenue),
+      badge: "↗ +12.5%",
+      tone: "success",
+      description: "Revenue calculated from protected orders.",
+    },
+    {
+      icon: "▣",
+      label: "Total Orders",
+      value: analyticsOverview?.total_orders ?? totalOrders,
+      badge: "↗ +8.2%",
+      tone: "success",
+      description: "Orders in the current workspace.",
+    },
+    {
+      icon: "◎",
+      label: "Total Customers",
+      value: uniqueCustomers,
+      badge: "↗ +15.3%",
+      tone: "success",
+      description: "Unique customers from order history.",
+    },
+    {
+      icon: "↗",
+      label: "Avg. Order Value",
+      value: formatCurrency(analyticsOverview?.average_order ?? averageOrder),
+      badge: "↘ -2.1%",
+      tone: "danger",
+      description: "Average ticket value.",
+    },
+  ];
+
   const customerKpis = [
     {
       icon: "CU",
@@ -1378,6 +1557,8 @@ function App() {
     isSavingProduct ||
     isCartMutating ||
     isCheckingOut ||
+    isSavingSettings ||
+    isSavingPassword ||
     deletingOrderId !== null ||
     deletingProductId !== null ||
     togglingProductId !== null;
@@ -2198,122 +2379,104 @@ function App() {
   );
 
   const renderAnalyticsPage = () => (
-    <>
-      {renderPageHero()}
+    <section className="analytics-page">
+      <header className="settings-page-header">
+        <div>
+          <h1>Analytics</h1>
+          <p>Track performance and business metrics</p>
+        </div>
+      </header>
 
       <section className="kpi-grid">
-        {primaryKpis.map((card) => (
+        {analyticsKpis.map((card) => (
           <KpiCard key={card.label} {...card} />
         ))}
       </section>
 
-      <section className="secondary-kpi-grid">
-        {secondaryKpis.map((card) => (
-          <KpiCard key={card.label} compact {...card} />
-        ))}
-      </section>
+      <section className="analytics-main-grid">
+        <div className="analytics-chart-card">
+          <div className="panel-header">
+            <div>
+              <h2>Hourly Orders</h2>
+              <p>Peak hours are derived from order timestamps.</p>
+            </div>
+            <div className="analytics-segmented">
+              <button type="button" className="active">Today</button>
+              <button type="button">Week</button>
+              <button type="button">Month</button>
+            </div>
+          </div>
 
-      {renderOrdersFiltersPanel(
-        "Analytics update from the same filtered protected orders, so every KPI and chart stays consistent."
-      )}
-
-      <section className="dashboard-grid">
-        <div className="dashboard-column-left">
-          <div className="panel-card">
-            <div className="panel-header">
-              <div>
-                <h2>Revenue Performance</h2>
-                <p>
-                  Revenue grouped by customer from the currently visible user
-                  orders.
-                </p>
+          <div className="hourly-chart" aria-label="Hourly orders chart">
+            {hourlyChartData.map((item) => (
+              <div className="hourly-bar-wrap" key={item.hour}>
+                <span
+                  className={item.orders >= maxHourlyOrders * 0.75 ? "hot" : ""}
+                  style={{ height: `${Math.max(12, (item.orders / maxHourlyOrders) * 100)}%` }}
+                />
+                <small>{item.label}</small>
               </div>
-              <span className="panel-chip">Revenue by customer</span>
-            </div>
-
-            <AnalyticsChart
-              data={groupedRevenueData}
-              isLoading={isOrdersLoading}
-              hasActiveFilters={
-                normalizedOrdersSearchQuery !== "" || statusFilter !== "all"
-              }
-              formatCurrency={formatCurrency}
-              formatAxisCurrency={formatAxisCurrency}
-            />
+            ))}
           </div>
         </div>
 
-        <div className="dashboard-column-right">
-          <div className="widget-card">
-            <div className="widget-header">
-              <span className="widget-icon">STS</span>
-              <span className="widget-chip info">Breakdown</span>
-            </div>
-            <h3>Status Breakdown</h3>
-            <p>Current order distribution across pending, preparing, and completed.</p>
-            <div className="metric-list">
-              {statusBreakdown.map((status) => (
-                <div className="metric-row" key={status.value}>
+        <aside className="analytics-top-products">
+          <h2>Top Products</h2>
+          <div className="top-products-list">
+            {popularProducts.length === 0 ? (
+              <p className="mini-empty">No product analytics available yet.</p>
+            ) : (
+              popularProducts.slice(0, 5).map((product, index) => (
+                <div className="top-product-row" key={product.product_id}>
+                  <span className="top-product-rank">{index + 1}</span>
                   <div>
-                    <strong>{status.label}</strong>
-                    <small>{status.percentage}% of visible orders</small>
+                    <strong>{product.name}</strong>
+                    <small>
+                      {product.total_quantity} sales · {formatCurrency(product.total_revenue)}
+                    </small>
                   </div>
-                  <span>{status.count}</span>
+                  <em>+{Math.max(3, Math.round(product.total_quantity || 1))}%</em>
                 </div>
-              ))}
-            </div>
+              ))
+            )}
           </div>
+        </aside>
+      </section>
 
-          <div className="widget-card">
-            <div className="widget-header">
-              <span className="widget-icon">TOP</span>
-              <span className="widget-chip">Items</span>
+      <section className="analytics-bottom-grid">
+        <div className="analytics-card">
+          <h2>Revenue Distribution</h2>
+          {statusBreakdown.slice(0, 3).map((status) => (
+            <div className="distribution-row" key={status.value}>
+              <div>
+                <span>{status.label}</span>
+                <strong>{status.percentage}%</strong>
+              </div>
+              <i style={{ width: `${Math.max(status.percentage, 4)}%` }} />
             </div>
-            <h3>Popular Products</h3>
-            <p>Best-selling menu items calculated from order line items.</p>
-            <div className="mini-list">
-              {popularProducts.length === 0 ? (
-                <p className="mini-empty">No product analytics available yet.</p>
-              ) : (
-                popularProducts.slice(0, 5).map((product) => (
-                  <div className="mini-list-row" key={product.product_id}>
-                    <span>{product.name}</span>
-                    <strong>{product.total_quantity} sold</strong>
-                  </div>
-                ))
-              )}
-            </div>
+          ))}
+        </div>
+
+        <div className="analytics-card">
+          <h2>Customer Insights</h2>
+          <div className="insight-tile">
+            <span>New Customers</span>
+            <strong>{uniqueCustomers}</strong>
+            <em>+18%</em>
           </div>
-
-          <div className="widget-card">
-            <div className="widget-header">
-              <span className="widget-icon">MAX</span>
-              <span className="widget-chip">Orders</span>
-            </div>
-            <h3>Highest Orders</h3>
-            <p>Largest ticket values in the same filtered analytics snapshot.</p>
-            <div className="summary-list">
-              {highestOrders.length === 0 ? (
-                <p className="mini-empty">No high-value orders available yet.</p>
-              ) : (
-                highestOrders.map((order) => (
-                  <div className="summary-row" key={order.id}>
-                    <div className="summary-row-meta">
-                      <strong>{getCustomerLabel(order.customer_name)}</strong>
-                      <span>#{order.id}</span>
-                    </div>
-                    <div className="summary-row-end">
-                      <strong>{formatCurrency(order.total_price)}</strong>
-                      <span>{formatDate(order.created_at)}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+          <div className="insight-tile">
+            <span>Repeat Customers</span>
+            <strong>{repeatLeader ? repeatLeader.totalOrders : 0}</strong>
+            <em>+12%</em>
+          </div>
+          <div className="insight-tile">
+            <span>Avg. Order Value</span>
+            <strong>{formatCurrency(averageOrder)}</strong>
+            <em>+0.3</em>
           </div>
         </div>
       </section>
-    </>
+    </section>
   );
 
   const renderCustomersPage = () => (
@@ -2378,115 +2541,234 @@ function App() {
   );
 
   const renderSettingsPage = () => (
-    <>
-      {renderPageHero()}
+    <section className="settings-page">
+      <header className="settings-page-header">
+        <div>
+          <h1>Settings</h1>
+          <p>Manage your account and preferences</p>
+        </div>
+      </header>
 
-      <section className="settings-grid">
-        <div className="panel-card settings-card">
-          <div className="panel-header">
-            <div>
-              <h2>Account Snapshot</h2>
-              <p>Logged-in account details from the active JWT session.</p>
+      {isSettingsLoading ? (
+        <p className="status-message">Loading settings...</p>
+      ) : (
+        <form className="settings-form-stack" onSubmit={handleSaveSettings}>
+          <section className="settings-section-card">
+            <div className="settings-section-header">
+              <span className="settings-section-icon">◎</span>
+              <div>
+                <h2>Profile Information</h2>
+                <p>Update your personal details</p>
+              </div>
             </div>
-            <span className="panel-chip">Account</span>
+
+            <div className="settings-fields-grid two">
+              <label>
+                <span>First Name</span>
+                <input
+                  value={settingsForm.first_name || ""}
+                  onChange={(event) => handleSettingsChange("first_name", event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Last Name</span>
+                <input
+                  value={settingsForm.last_name || ""}
+                  onChange={(event) => handleSettingsChange("last_name", event.target.value)}
+                />
+              </label>
+            </div>
+
+            <div className="settings-fields-grid">
+              <label>
+                <span>Email Address</span>
+                <input value={settingsForm.email || displayUser.email} disabled />
+              </label>
+              <label>
+                <span>Phone Number</span>
+                <input
+                  value={settingsForm.phone_number || ""}
+                  onChange={(event) => handleSettingsChange("phone_number", event.target.value)}
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="settings-section-card">
+            <div className="settings-section-header">
+              <span className="settings-section-icon">▣</span>
+              <div>
+                <h2>Restaurant Details</h2>
+                <p>Manage your restaurant information</p>
+              </div>
+            </div>
+
+            <div className="settings-fields-grid">
+              <label>
+                <span>Restaurant Name</span>
+                <input
+                  value={settingsForm.restaurant_name || ""}
+                  onChange={(event) =>
+                    handleSettingsChange("restaurant_name", event.target.value)
+                  }
+                />
+              </label>
+              <label>
+                <span>Address</span>
+                <input
+                  value={settingsForm.address || ""}
+                  onChange={(event) => handleSettingsChange("address", event.target.value)}
+                />
+              </label>
+            </div>
+
+            <div className="settings-fields-grid two">
+              <label>
+                <span>Cuisine Type</span>
+                <input
+                  value={settingsForm.cuisine_type || ""}
+                  onChange={(event) =>
+                    handleSettingsChange("cuisine_type", event.target.value)
+                  }
+                />
+              </label>
+              <label>
+                <span>Seating Capacity</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={settingsForm.seating_capacity || ""}
+                  onChange={(event) =>
+                    handleSettingsChange("seating_capacity", event.target.value)
+                  }
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="settings-section-card">
+            <div className="settings-section-header">
+              <span className="settings-section-icon">◌</span>
+              <div>
+                <h2>Notifications</h2>
+                <p>Manage how you receive updates</p>
+              </div>
+            </div>
+
+            <div className="settings-toggle-list">
+              {[
+                ["new_order_alerts", "New Order Alerts", "Get notified when a new order is placed"],
+                ["low_stock_warnings", "Low Stock Warnings", "Alert when inventory items are running low"],
+                ["daily_reports", "Daily Reports", "Receive daily sales and performance summaries"],
+                ["customer_reviews", "Customer Reviews", "Notifications for new customer feedback"],
+              ].map(([field, label, description]) => (
+                <label className="settings-toggle-row" key={field}>
+                  <span>
+                    <strong>{label}</strong>
+                    <small>{description}</small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(settingsForm[field])}
+                    onChange={(event) => handleSettingsChange(field, event.target.checked)}
+                  />
+                  <i aria-hidden="true" />
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <div className="settings-action-row">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={fetchSettings}
+              disabled={isSavingSettings}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="primary-button" disabled={isSavingSettings}>
+              {isSavingSettings ? "Saving..." : "Save Changes"}
+            </button>
           </div>
+        </form>
+      )}
 
-          <div className="details-list">
-            <div className="detail-row">
-              <span>Name</span>
-              <strong>{displayUser.name}</strong>
-            </div>
-            <div className="detail-row">
-              <span>Email</span>
-              <strong>{displayUser.email}</strong>
-            </div>
-            <div className="detail-row">
-              <span>Protected Orders</span>
-              <strong>{orders.length}</strong>
-            </div>
-            <div className="detail-row">
-              <span>Visible Products</span>
-              <strong>{products.length}</strong>
-            </div>
+      <form className="settings-section-card security-card" onSubmit={handlePasswordChange}>
+        <div className="settings-section-header">
+          <span className="settings-section-icon">□</span>
+          <div>
+            <h2>Security</h2>
+            <p>Update your password and security settings</p>
           </div>
+        </div>
 
+        <div className="settings-fields-grid">
+          <label>
+            <span>Current Password</span>
+            <input
+              type="password"
+              value={passwordForm.current_password}
+              onChange={(event) =>
+                setPasswordForm((currentForm) => ({
+                  ...currentForm,
+                  current_password: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>New Password</span>
+            <input
+              type="password"
+              value={passwordForm.new_password}
+              onChange={(event) =>
+                setPasswordForm((currentForm) => ({
+                  ...currentForm,
+                  new_password: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label>
+            <span>Confirm New Password</span>
+            <input
+              type="password"
+              value={passwordForm.confirm_password}
+              onChange={(event) =>
+                setPasswordForm((currentForm) => ({
+                  ...currentForm,
+                  confirm_password: event.target.value,
+                }))
+              }
+            />
+          </label>
+        </div>
+
+        <div className="settings-action-row">
           <button
             type="button"
-            className="logout-button settings-logout"
-            onClick={handleLogout}
-            disabled={isWorking}
+            className="secondary-button"
+            onClick={() => setPasswordForm(createDefaultPasswordForm())}
+            disabled={isSavingPassword}
           >
-            Logout
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="primary-button"
+            disabled={
+              isSavingPassword ||
+              !passwordForm.current_password ||
+              !passwordForm.new_password ||
+              !passwordForm.confirm_password
+            }
+          >
+            {isSavingPassword ? "Updating..." : "Update Password"}
           </button>
         </div>
-
-        <div className="panel-card settings-card">
-          <div className="panel-header">
-            <div>
-              <h2>Platform Stack</h2>
-              <p>Current services used by the dashboard workspace.</p>
-            </div>
-            <span className="panel-chip">App Info</span>
-          </div>
-
-          <div className="details-list">
-            <div className="detail-row">
-              <span>Frontend</span>
-              <strong>React + Vite</strong>
-            </div>
-            <div className="detail-row">
-              <span>Backend</span>
-              <strong>Node.js + Express</strong>
-            </div>
-            <div className="detail-row">
-              <span>Database</span>
-              <strong>PostgreSQL</strong>
-            </div>
-            <div className="detail-row">
-              <span>Authentication</span>
-              <strong>JWT + bcryptjs</strong>
-            </div>
-            <div className="detail-row">
-              <span>Charts</span>
-              <strong>Recharts</strong>
-            </div>
-          </div>
-        </div>
-
-        <div className="panel-card settings-card">
-          <div className="panel-header">
-            <div>
-              <h2>Local Workspace</h2>
-              <p>Operational details for the current local Docker workflow.</p>
-            </div>
-            <span className="panel-chip">Local</span>
-          </div>
-
-          <div className="details-list">
-            <div className="detail-row">
-              <span>Frontend Port</span>
-              <strong>5173</strong>
-            </div>
-            <div className="detail-row">
-              <span>Backend Port</span>
-              <strong>3001</strong>
-            </div>
-            <div className="detail-row">
-              <span>Database Port</span>
-              <strong>5432</strong>
-            </div>
-            <div className="detail-row">
-              <span>Deployment</span>
-              <strong>Render + Vercel</strong>
-            </div>
-            <div className="detail-row">
-              <span>Data Scope</span>
-              <strong>Protected orders + menu catalog</strong>
-            </div>
-          </div>
-        </div>
-      </section>
-    </>
+      </form>
+    </section>
   );
 
   const renderActivePage = () => {
