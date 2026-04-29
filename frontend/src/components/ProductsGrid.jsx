@@ -32,6 +32,7 @@ function ProductsGrid({
   onToggle,
   onAddToCart,
   getCartQuantity,
+  isCartBusy = false,
   deletingProductId,
   togglingProductId,
   formatCurrency,
@@ -115,6 +116,7 @@ function ProductsGrid({
                 onClick={() => onAddToCart(product)}
                 disabled={
                   !product.is_available ||
+                  isCartBusy ||
                   Boolean(deletingProductId) ||
                   Boolean(togglingProductId)
                 }

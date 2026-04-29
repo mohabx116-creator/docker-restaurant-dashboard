@@ -108,6 +108,84 @@ function normalizeCartItems(items) {
     }));
 }
 
+function createHttpError(message, statusCode = 400) {
+    const error = new Error(message);
+    error.statusCode = statusCode;
+    return error;
+}
+
+function normalizeQuantity(value, fallbackValue = 1) {
+    const quantity = Number(value ?? fallbackValue);
+    return Number.isInteger(quantity) ? quantity : null;
+}
+
+async function getActiveCartId(userId, client = pool) {
+    const existingCart = await client.query(
+        "SELECT id FROM carts WHERE user_id = $1 AND status = 'active' ORDER BY id DESC LIMIT 1",
+        [userId]
+    );
+
+    if (existingCart.rows.length > 0) {
+        return existingCart.rows[0].id;
+    }
+
+    try {
+        const createdCart = await client.query(
+            "INSERT INTO carts (user_id, status) VALUES ($1, 'active') RETURNING id",
+            [userId]
+        );
+
+        return createdCart.rows[0].id;
+    } catch (error) {
+        if (error.code !== "23505") {
+            throw error;
+        }
+
+        const cartAfterConflict = await client.query(
+            "SELECT id FROM carts WHERE user_id = $1 AND status = 'active' ORDER BY id DESC LIMIT 1",
+            [userId]
+        );
+
+        return cartAfterConflict.rows[0].id;
+    }
+}
+
+async function getCartPayload(userId, client = pool) {
+    const cartId = await getActiveCartId(userId, client);
+    const itemsResult = await client.query(
+        `SELECT
+            ci.product_id,
+            p.name,
+            p.description,
+            p.price,
+            p.image_url,
+            p.category,
+            p.is_available,
+            ci.quantity,
+            (ci.quantity * p.price) AS subtotal
+         FROM cart_items ci
+         JOIN products p ON p.id = ci.product_id
+         WHERE ci.cart_id = $1
+         ORDER BY ci.id ASC`,
+        [cartId]
+    );
+
+    const items = itemsResult.rows.map((item) => ({
+        ...item,
+        price: Number(item.price),
+        quantity: Number(item.quantity),
+        subtotal: Number(item.subtotal),
+    }));
+
+    return {
+        id: cartId,
+        status: "active",
+        items,
+        items_count: items.reduce((sum, item) => sum + item.quantity, 0),
+        subtotal: items.reduce((sum, item) => sum + item.subtotal, 0),
+    };
+}
+
 async function seedProductsIfEmpty() {
     const countResult = await pool.query("SELECT COUNT(*)::int AS count FROM products");
     const existingCount = countResult.rows[0]?.count || 0;
@@ -178,6 +256,28 @@ async function initDB() {
         )
     `);
 
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS carts (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            status TEXT DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS cart_items (
+            id SERIAL PRIMARY KEY,
+            cart_id INTEGER NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES products(id),
+            quantity INTEGER NOT NULL CHECK (quantity > 0),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(cart_id, product_id)
+        )
+    `);
+
     await pool.query(
         "ALTER TABLE orders ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'"
     );
@@ -208,6 +308,22 @@ async function initDB() {
     await pool.query("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS unit_price NUMERIC");
     await pool.query(
         "ALTER TABLE order_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    );
+    await pool.query("ALTER TABLE carts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'");
+    await pool.query(
+        "ALTER TABLE carts ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    );
+    await pool.query(
+        "ALTER TABLE carts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    );
+    await pool.query(
+        "ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    );
+    await pool.query(
+        "ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    );
+    await pool.query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS carts_one_active_per_user ON carts(user_id) WHERE status = 'active'"
     );
 
     await seedProductsIfEmpty();
@@ -310,16 +426,127 @@ app.post("/orders", authenticateToken, async (req, res) => {
     res.json(result.rows[0]);
 });
 
+app.get("/cart", authenticateToken, async (req, res) => {
+    const cart = await getCartPayload(req.user.id);
+    res.json(cart);
+});
+
+app.post("/cart/items", authenticateToken, async (req, res) => {
+    const productId = Number(req.body.product_id);
+    const quantity = normalizeQuantity(req.body.quantity, 1);
+
+    if (!Number.isInteger(productId) || productId <= 0 || !quantity || quantity <= 0) {
+        return res.status(400).json({ message: "Valid product_id and quantity are required." });
+    }
+
+    const productResult = await pool.query(
+        "SELECT id, name, is_available FROM products WHERE id = $1",
+        [productId]
+    );
+
+    if (productResult.rows.length === 0) {
+        return res.status(404).json({ message: "Product not found." });
+    }
+
+    if (!productResult.rows[0].is_available) {
+        return res.status(400).json({ message: "Product is currently unavailable." });
+    }
+
+    const cartId = await getActiveCartId(req.user.id);
+
+    await pool.query(
+        `INSERT INTO cart_items (cart_id, product_id, quantity)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (cart_id, product_id)
+         DO UPDATE SET
+            quantity = cart_items.quantity + EXCLUDED.quantity,
+            updated_at = CURRENT_TIMESTAMP`,
+        [cartId, productId, quantity]
+    );
+
+    await pool.query("UPDATE carts SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", [cartId]);
+
+    const cart = await getCartPayload(req.user.id);
+    res.status(201).json(cart);
+});
+
+app.patch("/cart/items/:productId", authenticateToken, async (req, res) => {
+    const productId = Number(req.params.productId);
+    const quantity = normalizeQuantity(req.body.quantity, 0);
+
+    if (!Number.isInteger(productId) || productId <= 0 || quantity === null) {
+        return res.status(400).json({ message: "Valid product id and quantity are required." });
+    }
+
+    const cartId = await getActiveCartId(req.user.id);
+
+    if (quantity <= 0) {
+        await pool.query("DELETE FROM cart_items WHERE cart_id = $1 AND product_id = $2", [
+            cartId,
+            productId,
+        ]);
+    } else {
+        const productResult = await pool.query(
+            "SELECT id, is_available FROM products WHERE id = $1",
+            [productId]
+        );
+
+        if (productResult.rows.length === 0) {
+            return res.status(404).json({ message: "Product not found." });
+        }
+
+        if (!productResult.rows[0].is_available) {
+            return res.status(400).json({ message: "Product is currently unavailable." });
+        }
+
+        await pool.query(
+            `UPDATE cart_items
+             SET quantity = $1, updated_at = CURRENT_TIMESTAMP
+             WHERE cart_id = $2 AND product_id = $3`,
+            [quantity, cartId, productId]
+        );
+    }
+
+    await pool.query("UPDATE carts SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", [cartId]);
+
+    const cart = await getCartPayload(req.user.id);
+    res.json(cart);
+});
+
+app.delete("/cart/items/:productId", authenticateToken, async (req, res) => {
+    const productId = Number(req.params.productId);
+
+    if (!Number.isInteger(productId) || productId <= 0) {
+        return res.status(400).json({ message: "Valid product id is required." });
+    }
+
+    const cartId = await getActiveCartId(req.user.id);
+
+    await pool.query("DELETE FROM cart_items WHERE cart_id = $1 AND product_id = $2", [
+        cartId,
+        productId,
+    ]);
+    await pool.query("UPDATE carts SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", [cartId]);
+
+    const cart = await getCartPayload(req.user.id);
+    res.json(cart);
+});
+
+app.delete("/cart", authenticateToken, async (req, res) => {
+    const cartId = await getActiveCartId(req.user.id);
+
+    await pool.query("DELETE FROM cart_items WHERE cart_id = $1", [cartId]);
+    await pool.query("UPDATE carts SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", [cartId]);
+
+    const cart = await getCartPayload(req.user.id);
+    res.json(cart);
+});
+
 app.post("/orders/cart", authenticateToken, async (req, res) => {
     const normalizedCustomerName = String(req.body.customer_name || "").trim();
-    const normalizedItems = normalizeCartItems(req.body.items);
 
     if (!normalizedCustomerName) {
         return res.status(400).json({ message: "Customer name is required." });
-    }
-
-    if (normalizedItems.length === 0) {
-        return res.status(400).json({ message: "Cart items are required." });
     }
 
     const client = await pool.connect();
@@ -327,34 +554,36 @@ app.post("/orders/cart", authenticateToken, async (req, res) => {
     try {
         await client.query("BEGIN");
 
-        const productIds = normalizedItems.map((item) => item.product_id);
-
-        const productsResult = await client.query(
-            `SELECT id, name, price, image_url, category, is_available
-             FROM products
-             WHERE id = ANY($1::int[])`,
-            [productIds]
+        const cartId = await getActiveCartId(req.user.id, client);
+        const cartItemsResult = await client.query(
+            `SELECT
+                ci.product_id,
+                ci.quantity,
+                p.name,
+                p.price,
+                p.image_url,
+                p.category,
+                p.is_available
+             FROM cart_items ci
+             JOIN products p ON p.id = ci.product_id
+             WHERE ci.cart_id = $1
+             ORDER BY ci.id ASC
+             FOR UPDATE`,
+            [cartId]
         );
 
-        const productsById = new Map(
-            productsResult.rows.map((product) => [Number(product.id), product])
-        );
+        if (cartItemsResult.rows.length === 0) {
+            throw createHttpError("Cart is empty.", 400);
+        }
 
-        for (const item of normalizedItems) {
-            const product = productsById.get(item.product_id);
-
-            if (!product) {
-                throw new Error(`Product ${item.product_id} was not found.`);
-            }
-
+        for (const product of cartItemsResult.rows) {
             if (!product.is_available) {
-                throw new Error(`${product.name} is currently out of stock.`);
+                throw createHttpError(`${product.name} is currently out of stock.`, 400);
             }
         }
 
-        const totalPrice = normalizedItems.reduce((sum, item) => {
-            const product = productsById.get(item.product_id);
-            return sum + Number(product.price) * item.quantity;
+        const totalPrice = cartItemsResult.rows.reduce((sum, item) => {
+            return sum + Number(item.price) * Number(item.quantity);
         }, 0);
 
         const orderResult = await client.query(
@@ -367,24 +596,25 @@ app.post("/orders/cart", authenticateToken, async (req, res) => {
         const order = orderResult.rows[0];
         const createdItems = [];
 
-        for (const item of normalizedItems) {
-            const product = productsById.get(item.product_id);
-
+        for (const item of cartItemsResult.rows) {
             const itemResult = await client.query(
                 `INSERT INTO order_items (order_id, product_id, quantity, unit_price)
                  VALUES ($1, $2, $3, $4)
                  RETURNING *`,
-                [order.id, item.product_id, item.quantity, Number(product.price)]
+                [order.id, item.product_id, Number(item.quantity), Number(item.price)]
             );
 
             createdItems.push({
                 ...itemResult.rows[0],
-                product_name: product.name,
-                image_url: product.image_url,
-                category: product.category,
-                subtotal: Number(product.price) * item.quantity,
+                product_name: item.name,
+                image_url: item.image_url,
+                category: item.category,
+                subtotal: Number(item.price) * Number(item.quantity),
             });
         }
+
+        await client.query("DELETE FROM cart_items WHERE cart_id = $1", [cartId]);
+        await client.query("UPDATE carts SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", [cartId]);
 
         await client.query("COMMIT");
 
@@ -396,11 +626,8 @@ app.post("/orders/cart", authenticateToken, async (req, res) => {
     } catch (error) {
         await client.query("ROLLBACK");
 
-        res.status(400).json({
-            message:
-                error instanceof Error
-                    ? error.message
-                    : "Failed to create order from cart.",
+        res.status(error.statusCode || 500).json({
+            message: error.statusCode ? error.message : "Failed to create order from cart.",
         });
     } finally {
         client.release();

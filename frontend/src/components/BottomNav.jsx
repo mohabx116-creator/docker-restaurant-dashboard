@@ -8,16 +8,20 @@ const NAV_ITEMS = [
 ];
 
 function BottomNav({ activePage, onPageChange, onPrimaryAction, cartItemsCount = 0 }) {
+  const showFloatingAction = activePage === "products" || activePage === "orders";
+
   return (
     <>
-      <button
-        type="button"
-        className="floating-order-button"
-        aria-label="Create item"
-        onClick={onPrimaryAction}
-      >
-        +
-      </button>
+      {showFloatingAction && (
+        <button
+          type="button"
+          className="floating-order-button"
+          aria-label="Create item"
+          onClick={onPrimaryAction}
+        >
+          +
+        </button>
+      )}
 
       <nav className="bottom-nav" aria-label="Mobile navigation">
         {NAV_ITEMS.map((item) => (

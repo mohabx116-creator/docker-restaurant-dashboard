@@ -17,6 +17,15 @@ function Topbar({
   onToggleSidebar,
   isMobileSidebarOpen,
 }) {
+  const searchPlaceholder =
+    pageTitle === "Products"
+      ? "Search menu items..."
+      : pageTitle === "Cart"
+        ? "Search cart items..."
+        : pageTitle === "Orders"
+          ? "Search orders..."
+          : "Search products, orders, or customers...";
+
   return (
     <header className="topbar-shell">
       <div className="topbar-mobile-row">
@@ -47,7 +56,7 @@ function Topbar({
           <span className="sr-only">Search</span>
           <input
             type="search"
-            placeholder="Search products, orders, or customers..."
+            placeholder={searchPlaceholder}
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
           />
