@@ -10,13 +10,14 @@ const getInitials = (name = "") =>
     .join("") || "RD";
 
 const NAV_ITEMS = [
-  { id: "overview", label: "Overview", icon: "overview" },
-  { id: "products", label: "Products / Menu", icon: "products" },
-  { id: "cart", label: "Order Cart", icon: "cart", hasBadge: true },
+  { id: "overview", label: "Dashboard", icon: "dashboard" },
   { id: "orders", label: "Orders", icon: "orders" },
+  { id: "products", label: "Menu", icon: "menu" },
+  { id: "cart", label: "Order Cart", icon: "cart", hasBadge: true },
   { id: "analytics", label: "Analytics", icon: "analytics" },
   { id: "customers", label: "Customers", icon: "customers" },
   { id: "settings", label: "Settings", icon: "settings" },
+  { id: "support", page: "settings", label: "Support", icon: "support" },
 ];
 
 function Sidebar({
@@ -59,7 +60,7 @@ function Sidebar({
             type="button"
             className={activePage === item.id ? "active" : ""}
             onClick={() => {
-              onPageChange(item.id);
+              onPageChange(item.page || item.id);
               onClose?.();
             }}
             aria-current={activePage === item.id ? "page" : undefined}

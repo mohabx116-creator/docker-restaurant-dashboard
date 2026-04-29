@@ -23,7 +23,7 @@ function Topbar({
   onCartClick,
 }) {
   const searchPlaceholder =
-    pageTitle === "Products"
+    pageTitle === "Menu"
       ? "Search menu items..."
       : pageTitle === "Cart"
         ? "Search cart items..."

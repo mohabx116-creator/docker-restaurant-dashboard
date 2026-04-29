@@ -9,7 +9,7 @@ const jwt = require("jsonwebtoken");
 
 const app = express();
 
-const ORDER_STATUSES = new Set(["pending", "preparing", "completed"]);
+const ORDER_STATUSES = new Set(["pending", "preparing", "completed", "cancelled"]);
 const DEFAULT_CLIENT_URL = "http://localhost:5173";
 const normalizeOrigin = (value) => String(value || "").trim().replace(/\/$/, "");
 const allowedOrigins = [
@@ -288,7 +288,7 @@ async function initDB() {
         "ALTER TABLE orders ALTER COLUMN status SET DEFAULT 'pending'"
     );
     await pool.query(
-        "UPDATE orders SET status = 'pending' WHERE status IS NULL OR status NOT IN ('pending', 'preparing', 'completed')"
+        "UPDATE orders SET status = 'pending' WHERE status IS NULL OR status NOT IN ('pending', 'preparing', 'completed', 'cancelled')"
     );
 
     await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT");
@@ -635,9 +635,32 @@ app.post("/orders/cart", authenticateToken, async (req, res) => {
 });
 
 app.get("/orders", authenticateToken, async (req, res) => {
+    const search = String(req.query.search || "").trim();
+    const status = String(req.query.status || "").trim().toLowerCase();
+    const params = [req.user.id];
+    const conditions = ["user_id = $1"];
+
+    if (search) {
+        params.push(`%${search}%`);
+        conditions.push(
+            `(customer_name ILIKE $${params.length} OR CAST(id AS TEXT) ILIKE $${params.length} OR status ILIKE $${params.length})`
+        );
+    }
+
+    if (status && status !== "all") {
+        const normalizedStatus = normalizeOrderStatus(status);
+
+        if (!normalizedStatus) {
+            return res.status(400).json({ message: "Invalid order status" });
+        }
+
+        params.push(normalizedStatus);
+        conditions.push(`status = $${params.length}`);
+    }
+
     const result = await pool.query(
-        "SELECT * FROM orders WHERE user_id = $1 ORDER BY id DESC",
-        [req.user.id]
+        `SELECT * FROM orders WHERE ${conditions.join(" AND ")} ORDER BY id DESC`,
+        params
     );
 
     res.json(result.rows);
@@ -674,6 +697,29 @@ app.get("/orders/:id/items", authenticateToken, async (req, res) => {
     );
 
     res.json(result.rows);
+});
+
+app.patch("/orders/:id/status", authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const normalizedStatus = normalizeOrderStatus(req.body.status);
+
+    if (!normalizedStatus) {
+        return res.status(400).json({ message: "Invalid order status" });
+    }
+
+    const result = await pool.query(
+        `UPDATE orders
+         SET status = $1
+         WHERE id = $2 AND user_id = $3
+         RETURNING *`,
+        [normalizedStatus, id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Order not found" });
+    }
+
+    res.json(result.rows[0]);
 });
 
 app.put("/orders/:id", authenticateToken, async (req, res) => {
@@ -715,9 +761,122 @@ app.delete("/orders/:id", authenticateToken, async (req, res) => {
     res.json({ message: "Order deleted successfully" });
 });
 
+app.get("/analytics/overview", authenticateToken, async (req, res) => {
+    const summaryResult = await pool.query(
+        `SELECT
+            COALESCE(SUM(total_price), 0)::numeric AS total_revenue,
+            COUNT(*)::int AS total_orders,
+            COUNT(*) FILTER (WHERE status = 'pending')::int AS pending_orders,
+            COUNT(*) FILTER (WHERE status = 'preparing')::int AS preparing_orders,
+            COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_orders,
+            COUNT(*) FILTER (WHERE status = 'cancelled')::int AS cancelled_orders,
+            COALESCE(AVG(total_price), 0)::numeric AS average_order
+         FROM orders
+         WHERE user_id = $1`,
+        [req.user.id]
+    );
+
+    const popularProductsResult = await pool.query(
+        `SELECT
+            p.id AS product_id,
+            p.name,
+            p.category,
+            p.image_url,
+            SUM(oi.quantity)::int AS total_quantity,
+            COALESCE(SUM(oi.quantity * oi.unit_price), 0)::numeric AS total_revenue
+         FROM order_items oi
+         JOIN orders o ON o.id = oi.order_id
+         JOIN products p ON p.id = oi.product_id
+         WHERE o.user_id = $1
+         GROUP BY p.id, p.name, p.category, p.image_url
+         ORDER BY total_quantity DESC, total_revenue DESC
+         LIMIT 8`,
+        [req.user.id]
+    );
+
+    const revenueByDayResult = await pool.query(
+        `SELECT
+            DATE(created_at) AS day,
+            COALESCE(SUM(total_price), 0)::numeric AS revenue,
+            COUNT(*)::int AS orders
+         FROM orders
+         WHERE user_id = $1
+         GROUP BY DATE(created_at)
+         ORDER BY day ASC
+         LIMIT 30`,
+        [req.user.id]
+    );
+
+    const topCategoriesResult = await pool.query(
+        `SELECT
+            p.category,
+            SUM(oi.quantity)::int AS total_quantity,
+            COALESCE(SUM(oi.quantity * oi.unit_price), 0)::numeric AS total_revenue
+         FROM order_items oi
+         JOIN orders o ON o.id = oi.order_id
+         JOIN products p ON p.id = oi.product_id
+         WHERE o.user_id = $1
+         GROUP BY p.category
+         ORDER BY total_revenue DESC`,
+        [req.user.id]
+    );
+
+    const summary = summaryResult.rows[0];
+
+    res.json({
+        total_revenue: Number(summary.total_revenue),
+        total_orders: summary.total_orders,
+        pending_orders: summary.pending_orders,
+        preparing_orders: summary.preparing_orders,
+        completed_orders: summary.completed_orders,
+        cancelled_orders: summary.cancelled_orders,
+        average_order: Number(summary.average_order),
+        popular_products: popularProductsResult.rows.map((item) => ({
+            ...item,
+            total_quantity: Number(item.total_quantity),
+            total_revenue: Number(item.total_revenue),
+        })),
+        revenue_by_day: revenueByDayResult.rows.map((item) => ({
+            ...item,
+            revenue: Number(item.revenue),
+            orders: Number(item.orders),
+        })),
+        top_categories: topCategoriesResult.rows.map((item) => ({
+            ...item,
+            total_quantity: Number(item.total_quantity),
+            total_revenue: Number(item.total_revenue),
+        })),
+    });
+});
+
 app.get("/products", authenticateToken, async (req, res) => {
+    const search = String(req.query.search || "").trim();
+    const category = String(req.query.category || "").trim();
+    const availability = String(req.query.availability || "").trim();
+    const params = [];
+    const conditions = [];
+
+    if (search) {
+        params.push(`%${search}%`);
+        conditions.push(
+            `(name ILIKE $${params.length} OR description ILIKE $${params.length} OR category ILIKE $${params.length} OR CAST(price AS TEXT) ILIKE $${params.length})`
+        );
+    }
+
+    if (category && category !== "all") {
+        params.push(category);
+        conditions.push(`category = $${params.length}`);
+    }
+
+    if (availability === "available" || availability === "out-of-stock") {
+        params.push(availability === "available");
+        conditions.push(`is_available = $${params.length}`);
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const result = await pool.query(
-        "SELECT * FROM products ORDER BY category ASC, name ASC, id ASC"
+        `SELECT * FROM products ${whereClause} ORDER BY category ASC, name ASC, id ASC`,
+        params
     );
 
     res.json(result.rows);

@@ -9,6 +9,8 @@ function OrdersTable({
   onEdit,
   onDelete,
   onCreate,
+  onView,
+  onUpdateStatus,
   formatCurrency,
   formatDate,
   getOrderStatus,
@@ -55,6 +57,43 @@ function OrdersTable({
     );
   }
 
+  const renderActions = (order) => (
+    <div className="orders-actions">
+      <button
+        type="button"
+        className="orders-action-button"
+        onClick={() => onView?.(order)}
+        disabled={isBusy || !onView}
+      >
+        Details
+      </button>
+      <button
+        type="button"
+        className="orders-action-button"
+        onClick={() => onEdit(order)}
+        disabled={isBusy}
+      >
+        Edit
+      </button>
+      <button
+        type="button"
+        className="orders-action-button"
+        onClick={() => onUpdateStatus?.(order)}
+        disabled={isBusy || !onUpdateStatus}
+      >
+        Status
+      </button>
+      <button
+        type="button"
+        className="orders-action-button danger"
+        onClick={() => onDelete(order.id)}
+        disabled={isBusy}
+      >
+        {deletingOrderId === order.id ? "Deleting..." : "Delete"}
+      </button>
+    </div>
+  );
+
   return (
     <>
       <div className="orders-mobile-list">
@@ -86,32 +125,7 @@ function OrdersTable({
                   <strong>{formatCurrency(order.total_price)}</strong>
                 </div>
 
-                <div className="orders-actions">
-                  <button
-                    type="button"
-                    className="orders-action-button"
-                    onClick={() => onEdit(order)}
-                    disabled={isBusy}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="orders-action-button"
-                    onClick={() => onEdit(order)}
-                    disabled={isBusy}
-                  >
-                    Update Status
-                  </button>
-                  <button
-                    type="button"
-                    className="orders-action-button danger"
-                    onClick={() => onDelete(order.id)}
-                    disabled={isBusy}
-                  >
-                    {deletingOrderId === order.id ? "Deleting..." : "Delete"}
-                  </button>
-                </div>
+                {renderActions(order)}
               </div>
             </article>
           );
@@ -149,34 +163,7 @@ function OrdersTable({
                     </span>
                   </td>
                   <td className="orders-cell">{formatDate(order.created_at)}</td>
-                  <td className="orders-cell">
-                    <div className="orders-actions">
-                      <button
-                        type="button"
-                        className="orders-action-button"
-                        onClick={() => onEdit(order)}
-                        disabled={isBusy}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="orders-action-button"
-                        onClick={() => onEdit(order)}
-                        disabled={isBusy}
-                      >
-                        Update Status
-                      </button>
-                      <button
-                        type="button"
-                        className="orders-action-button danger"
-                        onClick={() => onDelete(order.id)}
-                        disabled={isBusy}
-                      >
-                        {deletingOrderId === order.id ? "Deleting..." : "Delete"}
-                      </button>
-                    </div>
-                  </td>
+                  <td className="orders-cell orders-cell-actions">{renderActions(order)}</td>
                 </tr>
               );
             })}

@@ -13,6 +13,7 @@ import ToastStack from "./components/ToastStack";
 import ConfirmDialog from "./components/ConfirmDialog";
 import CartDrawer from "./components/CartDrawer";
 import Logo from "./components/Logo";
+import OrderDetailsModal from "./components/OrderDetailsModal";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -20,6 +21,7 @@ const ORDER_STATUSES = [
   { value: "pending", label: "Pending" },
   { value: "preparing", label: "Preparing" },
   { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
 const PRODUCT_CATEGORIES = [
@@ -29,6 +31,14 @@ const PRODUCT_CATEGORIES = [
   "Salads",
   "Desserts",
   "Drinks",
+];
+
+const MENU_TABS = [
+  { id: "all", label: "All Items", categories: [] },
+  { id: "main-course", label: "Main Course", categories: ["Burgers", "Pizzas", "Pasta", "Salads"] },
+  { id: "starters", label: "Starters", categories: ["Salads"] },
+  { id: "beverages", label: "Beverages", categories: ["Drinks"] },
+  { id: "desserts", label: "Desserts", categories: ["Desserts"] },
 ];
 
 const STATUS_LABELS = ORDER_STATUSES.reduce((acc, status) => {
@@ -44,10 +54,10 @@ const PAGE_META = {
     subtitle: "Welcome back. Here's what's happening in your restaurant today.",
   },
   products: {
-    title: "Products / Menu",
-    navTitle: "Products",
+    title: "Menu Management",
+    navTitle: "Menu",
     eyebrow: "Menu management",
-    subtitle: "Manage food items, pricing, categories, and availability.",
+    subtitle: "Design and organize your digital menu offerings.",
   },
   cart: {
     title: "Order Cart",
@@ -150,6 +160,7 @@ function App() {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [cartItems, setCartItems] = useState([]);
+  const [analyticsOverview, setAnalyticsOverview] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartCustomerName, setCartCustomerName] = useState("");
   const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -173,6 +184,10 @@ function App() {
   const [totalPrice, setTotalPrice] = useState("");
   const [orderStatus, setOrderStatus] = useState("pending");
   const [editingOrderId, setEditingOrderId] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderItems, setOrderItems] = useState([]);
+  const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
+  const [loadingOrderItems, setLoadingOrderItems] = useState(false);
 
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -190,6 +205,7 @@ function App() {
   const [cartSearchQuery, setCartSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [menuTab, setMenuTab] = useState("all");
   const [selectedAvailability, setSelectedAvailability] = useState("all");
   const [ordersSortBy, setOrdersSortBy] = useState("newest");
   const [sortBy, setSortBy] = useState("name-asc");
@@ -220,6 +236,7 @@ function App() {
     setOrders([]);
     setProducts([]);
     setCartItems([]);
+    setAnalyticsOverview(null);
     setOrdersError("");
     setProductsError("");
     setCartError("");
@@ -309,6 +326,7 @@ function App() {
   const clearProductFilters = () => {
     setProductSearchQuery("");
     setSelectedCategory("all");
+    setMenuTab("all");
     setSelectedAvailability("all");
     setSortBy("name-asc");
   };
@@ -455,6 +473,7 @@ function App() {
 
       await fetchCart();
       await fetchOrders();
+      await fetchAnalyticsOverview();
       setCartCustomerName("");
       setIsCartOpen(false);
       setActivePage("orders");
@@ -511,6 +530,17 @@ function App() {
     }
   };
 
+  const fetchAnalyticsOverview = async () => {
+    if (!token) return;
+
+    try {
+      const data = await apiRequest("/analytics/overview");
+      setAnalyticsOverview(data || null);
+    } catch {
+      setAnalyticsOverview(null);
+    }
+  };
+
   useEffect(() => {
     if (!token) {
       return;
@@ -520,6 +550,7 @@ function App() {
       fetchOrders();
       fetchProducts();
       fetchCart();
+      fetchAnalyticsOverview();
     }, 0);
 
     return () => window.clearTimeout(loadTimer);
@@ -617,6 +648,7 @@ function App() {
     clearProductFilters();
     setCartSearchQuery("");
     setCartItems([]);
+    setAnalyticsOverview(null);
     setIsCartOpen(false);
     setCartCustomerName("");
   };
@@ -651,6 +683,7 @@ function App() {
 
       resetOrderForm();
       await fetchOrders();
+      await fetchAnalyticsOverview();
       setActivePage("orders");
       addToast(
         isEditing ? "Order updated" : "Order created",
@@ -676,6 +709,67 @@ function App() {
     setTotalPrice(String(order.total_price));
     setOrderStatus(getOrderStatus(order.status));
     setActivePage("orders");
+  };
+
+  const fetchOrderItems = async (orderId) => {
+    setLoadingOrderItems(true);
+    setOrderItems([]);
+
+    try {
+      const data = await apiRequest(`/orders/${orderId}/items`);
+      setOrderItems(Array.isArray(data) ? data : []);
+    } catch (error) {
+      addToast(
+        "Order details unavailable",
+        error instanceof Error ? error.message : "Failed to load order items",
+        "error"
+      );
+    } finally {
+      setLoadingOrderItems(false);
+    }
+  };
+
+  const handleViewOrder = (order) => {
+    setSelectedOrder(order);
+    setIsOrderDetailsOpen(true);
+    fetchOrderItems(order.id);
+  };
+
+  const handleUpdateOrderStatus = async (order) => {
+    const currentStatus = getOrderStatus(order.status);
+    const nextStatus =
+      currentStatus === "pending"
+        ? "preparing"
+        : currentStatus === "preparing"
+          ? "completed"
+          : currentStatus === "completed"
+            ? "cancelled"
+            : "pending";
+
+    try {
+      const updatedOrder = await apiRequest(`/orders/${order.id}/status`, {
+        method: "PATCH",
+        body: { status: nextStatus },
+      });
+
+      setOrders((currentOrders) =>
+        currentOrders.map((currentOrder) =>
+          currentOrder.id === updatedOrder.id ? updatedOrder : currentOrder
+        )
+      );
+      fetchAnalyticsOverview();
+      addToast(
+        "Status updated",
+        `Order #${order.id} moved to ${STATUS_LABELS[nextStatus]}.`,
+        "success"
+      );
+    } catch (error) {
+      addToast(
+        "Status update failed",
+        error instanceof Error ? error.message : "Failed to update order status",
+        "error"
+      );
+    }
   };
 
   const handleProductFormChange = (field, value) => {
@@ -838,6 +932,7 @@ function App() {
         }
 
         await fetchOrders();
+        await fetchAnalyticsOverview();
         addToast("Order deleted", "The selected order was removed.", "success");
       } catch (error) {
         addToast(
@@ -933,6 +1028,7 @@ function App() {
 
   const filteredProducts = products
     .filter((product) => {
+      const activeMenuTab = MENU_TABS.find((tab) => tab.id === menuTab) || MENU_TABS[0];
       const haystack = [
         product.name,
         product.description || "",
@@ -943,6 +1039,8 @@ function App() {
         .join(" ")
         .toLowerCase();
       const matchesSearch = haystack.includes(normalizedProductSearchQuery);
+      const matchesMenuTab =
+        activeMenuTab.id === "all" || activeMenuTab.categories.includes(product.category);
       const matchesCategory =
         selectedCategory === "all" || product.category === selectedCategory;
       const matchesAvailability =
@@ -950,7 +1048,7 @@ function App() {
         (selectedAvailability === "available" && product.is_available) ||
         (selectedAvailability === "out-of-stock" && !product.is_available);
 
-      return matchesSearch && matchesCategory && matchesAvailability;
+      return matchesSearch && matchesMenuTab && matchesCategory && matchesAvailability;
     })
     .sort((a, b) => {
       if (sortBy === "price-low") {
@@ -1070,6 +1168,9 @@ function App() {
   const liveAttentionCount = pendingOrders + preparingOrders;
   const topCustomer = groupedRevenueData[0] || null;
   const topCustomers = customersData.slice(0, 5);
+  const popularProducts = Array.isArray(analyticsOverview?.popular_products)
+    ? analyticsOverview.popular_products
+    : [];
   const recentOrders = sortedFilteredOrders.slice(0, 5);
   const highestOrders = [...sortedFilteredOrders]
     .sort((a, b) => Number(b.total_price) - Number(a.total_price))
@@ -1386,6 +1487,21 @@ function App() {
 
   const renderProductsFiltersPanel = () => (
     <section className="products-filters-panel">
+      <div className="menu-tabs" role="tablist" aria-label="Menu categories">
+        {MENU_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={menuTab === tab.id}
+            className={menuTab === tab.id ? "active" : ""}
+            onClick={() => setMenuTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="products-inline-search">
         <span className="topbar-search-icon">Search</span>
         <input
@@ -1441,6 +1557,7 @@ function App() {
           onClick={clearProductFilters}
           disabled={
             normalizedProductSearchQuery === "" &&
+            menuTab === "all" &&
             selectedCategory === "all" &&
             selectedAvailability === "all" &&
             sortBy === "name-asc"
@@ -1672,20 +1789,20 @@ function App() {
           <div className="widget-card popular-panel">
             <div className="widget-header">
               <span className="widget-icon">TOP</span>
-              <span className="widget-chip">Customers</span>
+              <span className="widget-chip">Items</span>
             </div>
-            <h3>Popular Customers</h3>
-            <p>Highest-value guests from the current filtered revenue snapshot.</p>
+            <h3>Popular Items</h3>
+            <p>Best-selling products derived from order line items.</p>
 
             <div className="popular-list">
-              {topCustomers.length === 0 ? (
-                <p className="mini-empty">No customer revenue data available.</p>
+              {popularProducts.length === 0 ? (
+                <p className="mini-empty">No product sales data available.</p>
               ) : (
-                topCustomers.slice(0, 4).map((customer) => (
-                  <div className="popular-list-row" key={customer.name}>
+                popularProducts.slice(0, 4).map((product) => (
+                  <div className="popular-list-row" key={product.product_id}>
                     <div className="popular-list-user">
                       <span className="popular-list-avatar">
-                        {customer.name
+                        {product.name
                           .split(" ")
                           .filter(Boolean)
                           .slice(0, 2)
@@ -1693,11 +1810,11 @@ function App() {
                           .join("") || "RD"}
                       </span>
                       <div>
-                        <strong>{customer.name}</strong>
-                        <span>{customer.totalOrders} orders</span>
+                        <strong>{product.name}</strong>
+                        <span>{product.total_quantity} sold - {product.category}</span>
                       </div>
                     </div>
-                    <strong>{formatCurrency(customer.totalRevenue)}</strong>
+                    <strong>{formatCurrency(product.total_revenue)}</strong>
                   </div>
                 ))
               )}
@@ -1706,9 +1823,9 @@ function App() {
             <button
               type="button"
               className="widget-link-button"
-              onClick={() => setActivePage("customers")}
+              onClick={() => setActivePage("products")}
             >
-              View All Customers
+              View Menu
             </button>
           </div>
         </div>
@@ -1752,6 +1869,8 @@ function App() {
           onEdit={handleEditOrder}
           onDelete={requestDeleteOrder}
           onCreate={openCreateOrder}
+          onView={handleViewOrder}
+          onUpdateStatus={handleUpdateOrderStatus}
           formatCurrency={formatCurrency}
           formatDate={formatDate}
           getOrderStatus={getOrderStatus}
@@ -1922,6 +2041,7 @@ function App() {
         error={productsError}
         hasFilters={
           normalizedProductSearchQuery !== "" ||
+          menuTab !== "all" ||
           selectedCategory !== "all" ||
           selectedAvailability !== "all" ||
           sortBy !== "name-asc"
@@ -2049,6 +2169,8 @@ function App() {
             onEdit={handleEditOrder}
             onDelete={requestDeleteOrder}
             onCreate={openCreateOrder}
+            onView={handleViewOrder}
+            onUpdateStatus={handleUpdateOrderStatus}
             formatCurrency={formatCurrency}
             formatDate={formatDate}
             getOrderStatus={getOrderStatus}
@@ -2145,18 +2267,18 @@ function App() {
           <div className="widget-card">
             <div className="widget-header">
               <span className="widget-icon">TOP</span>
-              <span className="widget-chip">Customers</span>
+              <span className="widget-chip">Items</span>
             </div>
-            <h3>Top Customers</h3>
-            <p>Customers ranked by total revenue in the current filtered view.</p>
+            <h3>Popular Products</h3>
+            <p>Best-selling menu items calculated from order line items.</p>
             <div className="mini-list">
-              {topCustomers.length === 0 ? (
-                <p className="mini-empty">No customer analytics available yet.</p>
+              {popularProducts.length === 0 ? (
+                <p className="mini-empty">No product analytics available yet.</p>
               ) : (
-                topCustomers.map((customer) => (
-                  <div className="mini-list-row" key={customer.name}>
-                    <span>{customer.name}</span>
-                    <strong>{formatCurrency(customer.totalRevenue)}</strong>
+                popularProducts.slice(0, 5).map((product) => (
+                  <div className="mini-list-row" key={product.product_id}>
+                    <span>{product.name}</span>
+                    <strong>{product.total_quantity} sold</strong>
                   </div>
                 ))
               )}
@@ -2647,6 +2769,22 @@ function App() {
         onClear={clearCart}
         onCheckout={handleCheckoutCart}
         formatCurrency={formatCurrency}
+      />
+
+      <OrderDetailsModal
+        open={isOrderDetailsOpen}
+        order={selectedOrder}
+        items={orderItems}
+        loading={loadingOrderItems}
+        onClose={() => {
+          setIsOrderDetailsOpen(false);
+          setSelectedOrder(null);
+          setOrderItems([]);
+        }}
+        formatCurrency={formatCurrency}
+        formatDate={formatDate}
+        statusLabels={STATUS_LABELS}
+        getOrderStatus={getOrderStatus}
       />
 
       <ProductModal
