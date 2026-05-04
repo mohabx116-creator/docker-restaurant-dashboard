@@ -2837,26 +2837,46 @@ function App() {
             </div>
 
             <div className="auth-brand-copy">
-              <h2>Master your kitchen&apos;s rhythm with surgical precision.</h2>
+              <h2>Master your kitchen&apos;s rhythm</h2>
               <p>
-                Elevate your operational excellence with real-time analytics and
-                seamless order management.
+                Elevate your hospitality management with high-performance tools
+                designed for the modern executive chef and restaurant owner.
+                Precision, efficiency, and excellence in every plate.
               </p>
             </div>
 
-            <div className="auth-brand-metric">
-              <div className="auth-brand-avatars">
-                <span className="avatar-photo avatar-one" />
-                <span className="avatar-photo avatar-two" />
-                <span>+2K</span>
+            <div className="auth-brand-footer">
+              <div className="auth-brand-stats">
+                <span>
+                  <strong>99.9%</strong>
+                  <small>Uptime SLA</small>
+                </span>
+                <span>
+                  <strong>15min</strong>
+                  <small>Avg. setup time</small>
+                </span>
               </div>
-              <strong>
-                Join 2,000+ elite restaurateurs managing over 500k orders monthly.
-              </strong>
+
+              <div className="auth-brand-quote">
+                <span className="avatar-photo avatar-one" />
+                <p>
+                  <strong>&quot;RestoDash transformed our floor flow.&quot;</strong>
+                  Marco Rossi, Head Chef at L&apos;Etoile
+                </p>
+              </div>
+
+              <small className="auth-brand-copyright">
+                © 2024 RestoDash Lite. High-end hospitality management.
+              </small>
             </div>
           </div>
 
           <section className="auth-card">
+            <nav className="auth-card-nav" aria-label="Authentication help">
+              <button type="button">Support</button>
+              <button type="button">Help Center</button>
+            </nav>
+
             <div className="auth-mobile-brand">
               <Logo />
             </div>
@@ -2866,7 +2886,16 @@ function App() {
               <p>
                 {isRegister
                   ? "Create your account to start managing service, menu items, and guest flow."
-                  : "Enter your credentials to access your executive dashboard."}
+                  : (
+                    <>
+                      <span className="auth-desktop-copy">
+                        Please enter your details to access your dashboard.
+                      </span>
+                      <span className="auth-mobile-copy">
+                        Sign in to continue to your kitchen manager.
+                      </span>
+                    </>
+                  )}
               </p>
             </div>
 
@@ -2886,7 +2915,7 @@ function App() {
               )}
 
               <label className="auth-field">
-                <span>Email/Username</span>
+                <span>Email Address</span>
                 <div className="auth-input-shell">
                   <span className="auth-input-icon" aria-hidden="true">
                     @
@@ -2944,7 +2973,7 @@ function App() {
 
               <label className="auth-remember">
                 <input type="checkbox" disabled={isAuthLoading} />
-                <span>Keep me signed in on this device</span>
+                <span>Keep me signed in for 30 days</span>
               </label>
 
               <button
@@ -2958,7 +2987,7 @@ function App() {
                     : "Logging in..."
                   : isRegister
                     ? "Create Account"
-                    : "Login"}</span>
+                    : "Sign In to Dashboard"}</span>
                 {!isAuthLoading && <span aria-hidden="true">-&gt;</span>}
               </button>
             </form>
@@ -2975,8 +3004,9 @@ function App() {
 
                 <div className="auth-provider-row">
                   <button type="button" disabled={isAuthLoading}>
-                    <span className="auth-provider-icon" aria-hidden="true">SS</span>
-                    SSO
+                    <span className="auth-provider-icon" aria-hidden="true">G</span>
+                    <span className="auth-provider-label-desktop">SSO</span>
+                    <span className="auth-provider-label-mobile">Google</span>
                   </button>
                   <button type="button" disabled={isAuthLoading}>
                     <span className="auth-provider-icon" aria-hidden="true">K</span>
@@ -3007,7 +3037,7 @@ function App() {
 
             <p className="auth-security-note">
               <span aria-hidden="true">SEC</span>
-              Enterprise grade security &amp; 256-bit encryption
+              Secured by RestoDash Enterprise Infrastructure
             </p>
           </section>
         </section>
