@@ -1410,41 +1410,6 @@ function App() {
     },
   ];
 
-  const primaryKpis = [
-    {
-      icon: "$",
-      label: "Total Revenue",
-      value: formatCurrency(totalRevenue),
-      badge: `${uniqueCustomers} guests`,
-      tone: "warm",
-      description: "Revenue in the current filtered view.",
-    },
-    {
-      icon: "▣",
-      label: "Total Orders",
-      value: totalOrders,
-      badge: `${liveAttentionCount} active`,
-      tone: "neutral",
-      description: "Protected orders currently in scope.",
-    },
-    {
-      icon: "◷",
-      label: "Pending Orders",
-      value: pendingOrders,
-      badge: totalOrders ? `${Math.round((pendingOrders / totalOrders) * 100)}% open` : "0% open",
-      tone: "warm",
-      description: "Waiting for kitchen action.",
-    },
-    {
-      icon: "✓",
-      label: "Completed Orders",
-      value: completedOrders,
-      badge: `${completionRate}% closed`,
-      tone: "success",
-      description: "Orders completed successfully by the kitchen team.",
-    },
-  ];
-
   const analyticsKpis = [
     {
       icon: "$",
@@ -1932,28 +1897,83 @@ function App() {
     );
   };
 
-  const renderOverviewPage = () => (
-    <>
-      {renderPageHero()}
+  const renderOverviewPage = () => {
+    const overviewCards = [
+      {
+        icon: "$",
+        label: "Total Revenue",
+        value: formatCurrency(totalRevenue),
+        badge: "+12%",
+        tone: "violet",
+      },
+      {
+        icon: "▣",
+        label: "Total Orders",
+        value: totalOrders,
+        badge: "+5%",
+        tone: "green",
+      },
+      {
+        icon: "◷",
+        label: "Pending Orders",
+        value: pendingOrders,
+        badge: `${liveAttentionCount} active`,
+        tone: "amber",
+      },
+      {
+        icon: "✓",
+        label: "Completed Orders",
+        value: completedOrders,
+        badge: `${completionRate}%`,
+        tone: "blue",
+      },
+    ];
 
-      <section className="kpi-grid products-kpi-grid">
-        {primaryKpis.map((card) => (
-          <KpiCard key={card.label} {...card} />
-        ))}
-      </section>
+    return (
+      <section className="overview-reference-page">
+        <header className="overview-reference-header">
+          <div>
+            <h1>Dashboard Overview</h1>
+            <p>Welcome back, here is what&apos;s happening today.</p>
+          </div>
 
-      <section className="dashboard-grid dashboard-grid-overview">
-        <div className="dashboard-column-left">
-          <div className="panel-card">
-            <div className="panel-header">
-              <div>
-                <h2>Revenue &amp; Volume</h2>
-                <p>
-                  Grouped customer revenue from the live protected order set in
-                  the current dashboard view.
-                </p>
+          <div className="overview-reference-actions">
+            <button
+              type="button"
+              className="overview-reference-button ghost"
+              onClick={handleExportOrders}
+              disabled={!sortedFilteredOrders.length}
+            >
+              Export CSV
+            </button>
+            <button
+              type="button"
+              className="overview-reference-button primary"
+              onClick={openCreateOrder}
+            >
+              New Order
+            </button>
+          </div>
+        </header>
+
+        <section className="overview-reference-kpis" aria-label="Overview metrics">
+          {overviewCards.map((card) => (
+            <article className={`overview-reference-kpi tone-${card.tone}`} key={card.label}>
+              <div className="overview-reference-kpi-top">
+                <span>{card.icon}</span>
+                <small>{card.badge}</small>
               </div>
-              <div className="analytics-segmented">
+              <p>{card.label}</p>
+              <strong>{card.value}</strong>
+            </article>
+          ))}
+        </section>
+
+        <section className="overview-reference-main">
+          <article className="overview-reference-card revenue-card">
+            <div className="overview-reference-card-header">
+              <h2>Revenue &amp; Volume</h2>
+              <div className="overview-reference-tabs" aria-label="Revenue period">
                 <button type="button" className="active">Daily</button>
                 <button type="button">Weekly</button>
                 <button type="button">Monthly</button>
@@ -1969,41 +1989,29 @@ function App() {
               formatCurrency={formatCurrency}
               formatAxisCurrency={formatAxisCurrency}
             />
-          </div>
-        </div>
+          </article>
 
-        <div className="dashboard-column-right">
-          <div className="widget-card popular-panel">
-            <div className="widget-header">
-              <span className="widget-icon">TOP</span>
-              <span className="widget-chip">Items</span>
-            </div>
-            <h3>Popular Items</h3>
-            <p>Best-selling products derived from order line items.</p>
+          <aside className="overview-reference-card popular-card">
+            <h2>Popular Items</h2>
 
-            <div className="popular-list">
+            <div className="overview-reference-popular-list">
               {overviewPopularItems.length === 0 ? (
                 <p className="mini-empty">No product sales data available.</p>
               ) : (
-                overviewPopularItems.slice(0, 4).map((product) => (
-                  <div className="popular-list-row" key={product.product_id}>
-                    <div className="popular-list-user">
-                      <span className="popular-list-avatar">
+                overviewPopularItems.slice(0, 3).map((product) => (
+                  <div className="overview-reference-popular-row" key={product.product_id}>
+                    <div>
+                      <span className="overview-reference-product-thumb">
                         {product.image_url ? (
                           <img src={product.image_url} alt={product.name} />
                         ) : (
-                          product.name
-                            .split(" ")
-                            .filter(Boolean)
-                            .slice(0, 2)
-                            .map((part) => part[0]?.toUpperCase())
-                            .join("") || "RD"
+                          product.name?.[0]?.toUpperCase() || "R"
                         )}
                       </span>
-                      <div>
+                      <span>
                         <strong>{product.name}</strong>
-                        <span>{product.total_quantity} sold - {product.category}</span>
-                      </div>
+                        <small>{product.total_quantity} orders</small>
+                      </span>
                     </div>
                     <strong>{formatCurrency(product.total_revenue)}</strong>
                   </div>
@@ -2013,64 +2021,47 @@ function App() {
 
             <button
               type="button"
-              className="widget-link-button"
+              className="overview-reference-link"
               onClick={() => setActivePage("products")}
             >
-              View Menu
+              View All Menu Items
             </button>
-          </div>
-        </div>
-      </section>
+          </aside>
+        </section>
 
-      <section className="panel-card recent-orders-panel">
-        <div className="panel-header">
-          <div>
+        <section className="overview-reference-card overview-reference-recent">
+          <div className="overview-reference-card-header">
             <h2>Recent Orders</h2>
-            <p>Latest protected orders from the current filtered service view.</p>
-          </div>
-          <div className="panel-inline-actions">
-            <button
-              type="button"
-              className="table-toolbar-button"
-              onClick={() => setActivePage("orders")}
-            >
+            <button type="button" onClick={() => setActivePage("orders")}>
               View All
             </button>
-            <button
-              type="button"
-              className="table-toolbar-button"
-              onClick={handleExportOrders}
-              disabled={!sortedFilteredOrders.length}
-            >
-              Export
-            </button>
           </div>
-        </div>
 
-        <OrdersTable
-          orders={recentOrders}
-          totalOrders={orders.length}
-          hasActiveFilters={
-            normalizedOrdersSearchQuery !== "" || statusFilter !== "all"
-          }
-          editingOrderId={editingOrderId}
-          deletingOrderId={deletingOrderId}
-          isBusy={isWorking}
-          isLoading={isOrdersLoading}
-          onEdit={handleEditOrder}
-          onDelete={requestDeleteOrder}
-          onCreate={openCreateOrder}
-          onView={handleViewOrder}
-          onUpdateStatus={handleUpdateOrderStatus}
-          formatCurrency={formatCurrency}
-          formatDate={formatDate}
-          getOrderStatus={getOrderStatus}
-          statusLabels={STATUS_LABELS}
-          variant="compact"
-        />
+          <OrdersTable
+            orders={recentOrders}
+            totalOrders={orders.length}
+            hasActiveFilters={
+              normalizedOrdersSearchQuery !== "" || statusFilter !== "all"
+            }
+            editingOrderId={editingOrderId}
+            deletingOrderId={deletingOrderId}
+            isBusy={isWorking}
+            isLoading={isOrdersLoading}
+            onEdit={handleEditOrder}
+            onDelete={requestDeleteOrder}
+            onCreate={openCreateOrder}
+            onView={handleViewOrder}
+            onUpdateStatus={handleUpdateOrderStatus}
+            formatCurrency={formatCurrency}
+            formatDate={formatDate}
+            getOrderStatus={getOrderStatus}
+            statusLabels={STATUS_LABELS}
+            variant="compact"
+          />
+        </section>
       </section>
-    </>
-  );
+    );
+  };
 
 
   const renderCartPage = () => {
