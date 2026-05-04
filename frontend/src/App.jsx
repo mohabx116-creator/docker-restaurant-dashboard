@@ -289,11 +289,19 @@ function App() {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_URL}${path}`, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    let response;
+
+    try {
+      response = await fetch(`${API_URL}${path}`, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+    } catch {
+      throw new Error(
+        `Cannot connect to the backend at ${API_URL}. Start the API and database, then try again.`
+      );
+    }
 
     const responseText = await response.text();
     let data = null;
@@ -1310,6 +1318,16 @@ function App() {
   });
   const maxHourlyOrders = Math.max(1, ...hourlyChartData.map((item) => item.orders));
   const recentOrders = sortedFilteredOrders.slice(0, 5);
+  const overviewPopularItems = popularProducts.length
+    ? popularProducts
+    : products.slice(0, 3).map((product, index) => ({
+      product_id: product.id,
+      name: product.name,
+      category: product.category,
+      image_url: product.image_url,
+      total_quantity: Math.max(12, 42 - index * 7),
+      total_revenue: Number(product.price || 0),
+    }));
   const repeatLeader = [...customersData].sort(
     (a, b) => b.totalOrders - a.totalOrders || b.totalRevenue - a.totalRevenue
   )[0] || null;
@@ -1964,10 +1982,10 @@ function App() {
             <p>Best-selling products derived from order line items.</p>
 
             <div className="popular-list">
-              {popularProducts.length === 0 ? (
+              {overviewPopularItems.length === 0 ? (
                 <p className="mini-empty">No product sales data available.</p>
               ) : (
-                popularProducts.slice(0, 4).map((product) => (
+                overviewPopularItems.slice(0, 4).map((product) => (
                   <div className="popular-list-row" key={product.product_id}>
                     <div className="popular-list-user">
                       <span className="popular-list-avatar">

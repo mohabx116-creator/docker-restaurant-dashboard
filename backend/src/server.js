@@ -14,6 +14,7 @@ const DEFAULT_CLIENT_URL = "http://localhost:5173";
 const normalizeOrigin = (value) => String(value || "").trim().replace(/\/$/, "");
 const allowedOrigins = [
     DEFAULT_CLIENT_URL,
+    "http://127.0.0.1:5173",
     process.env.CLIENT_URL,
 ]
     .flatMap((value) => String(value || "").split(","))
@@ -33,6 +34,16 @@ app.use(
     })
 );
 app.use(express.json());
+
+const getJwtSecret = () => process.env.JWT_SECRET || "local_restaurant_dashboard_secret";
+
+function normalizeEmail(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function isValidEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 function normalizeOrderStatus(status = "pending") {
     const normalizedStatus = String(status).trim().toLowerCase() || "pending";
@@ -405,23 +416,45 @@ app.get("/health", async (req, res) => {
 });
 
 app.post("/auth/register", async (req, res) => {
-    const { name, email, password } = req.body;
+    const name = String(req.body.name || "").trim();
+    const email = normalizeEmail(req.body.email);
+    const password = String(req.body.password || "");
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    if (!name || !isValidEmail(email) || password.length < 6) {
+        return res.status(400).json({
+            message: "Name, a valid email, and a password of at least 6 characters are required.",
+        });
+    }
 
-    const result = await pool.query(
-        "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, created_at",
-        [name, email, hashedPassword]
-    );
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-    res.json({
-        message: "User registered successfully",
-        user: result.rows[0],
-    });
+        const result = await pool.query(
+            "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, created_at",
+            [name, email, hashedPassword]
+        );
+
+        res.json({
+            message: "User registered successfully",
+            user: result.rows[0],
+        });
+    } catch (error) {
+        if (error.code === "23505") {
+            return res.status(409).json({ message: "An account with this email already exists." });
+        }
+
+        console.error("Registration failed:", error);
+        res.status(500).json({ message: "Registration failed. Please try again." });
+    }
 });
 
 app.post("/auth/login", async (req, res) => {
-    const { email, password } = req.body;
+    const email = normalizeEmail(req.body.email);
+    const password = String(req.body.password || "");
+
+    if (!isValidEmail(email) || !password) {
+        return res.status(400).json({ message: "Email and password are required." });
+    }
 
     const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
 
@@ -438,7 +471,7 @@ app.post("/auth/login", async (req, res) => {
 
     const token = jwt.sign(
         { id: user.id, email: user.email },
-        process.env.JWT_SECRET,
+        getJwtSecret(),
         { expiresIn: "1h" }
     );
 
