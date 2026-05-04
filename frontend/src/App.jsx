@@ -2837,11 +2837,10 @@ function App() {
             </div>
 
             <div className="auth-brand-copy">
-              <h2>Master your kitchen&apos;s rhythm</h2>
+              <h2>Run service with fewer blind spots</h2>
               <p>
-                Elevate your hospitality management with high-performance tools
-                designed for the modern executive chef and restaurant owner.
-                Precision, efficiency, and excellence in every plate.
+                Monitor live orders, menu availability, revenue, and customer
+                activity from one focused restaurant operations workspace.
               </p>
             </div>
 
@@ -2849,19 +2848,19 @@ function App() {
               <div className="auth-brand-stats">
                 <span>
                   <strong>99.9%</strong>
-                  <small>Uptime SLA</small>
+                  <small>Service uptime</small>
                 </span>
                 <span>
                   <strong>15min</strong>
-                  <small>Avg. setup time</small>
+                  <small>Setup time</small>
                 </span>
               </div>
 
               <div className="auth-brand-quote">
                 <span className="avatar-photo avatar-one" />
                 <p>
-                  <strong>&quot;RestoDash transformed our floor flow.&quot;</strong>
-                  Marco Rossi, Head Chef at L&apos;Etoile
+                  <strong>&quot;The team can see orders, stock, and revenue without switching tools.&quot;</strong>
+                  RestoDash operations preview
                 </p>
               </div>
 
