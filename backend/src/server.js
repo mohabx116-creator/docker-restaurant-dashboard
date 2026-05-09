@@ -161,8 +161,18 @@ async function getActiveCartId(userId, client = pool) {
     }
 }
 
-async function getCartPayload(userId, client = pool) {
+async function getCartPayload(userId, client = pool, search = "") {
     const cartId = await getActiveCartId(userId, client);
+    const params = [cartId];
+    const conditions = ["ci.cart_id = $1"];
+
+    if (search) {
+        params.push(`%${search}%`);
+        conditions.push(
+            `(p.name ILIKE $${params.length} OR p.description ILIKE $${params.length} OR p.category ILIKE $${params.length} OR CAST(p.price AS TEXT) ILIKE $${params.length})`
+        );
+    }
+
     const itemsResult = await client.query(
         `SELECT
             ci.product_id,
@@ -176,9 +186,9 @@ async function getCartPayload(userId, client = pool) {
             (ci.quantity * p.price) AS subtotal
          FROM cart_items ci
          JOIN products p ON p.id = ci.product_id
-         WHERE ci.cart_id = $1
+         WHERE ${conditions.join(" AND ")}
          ORDER BY ci.id ASC`,
-        [cartId]
+        params
     );
 
     const items = itemsResult.rows.map((item) => ({
@@ -537,7 +547,8 @@ app.post("/orders", authenticateToken, async (req, res) => {
 });
 
 app.get("/cart", authenticateToken, async (req, res) => {
-    const cart = await getCartPayload(req.user.id);
+    const search = String(req.query.search || "").trim();
+    const cart = await getCartPayload(req.user.id, pool, search);
     res.json(cart);
 });
 

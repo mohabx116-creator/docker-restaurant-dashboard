@@ -9887,3 +9887,93 @@ body,
     grid-template-columns: 1fr;
   }
 }
+
+/* Professional field and live-search polish */
+.topbar-search,
+.orders-search input,
+.orders-select select,
+.products-inline-search,
+.form-field input,
+.form-field select,
+.filter-field select,
+.settings-fields-grid input,
+.cart-summary-panel input {
+  border: 1px solid #d7dbe7;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(18, 25, 38, 0.02);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.topbar-search {
+  min-height: 46px;
+  border-radius: 12px;
+  padding: 0 14px;
+  background: #fff;
+}
+
+.topbar-search:focus-within,
+.products-inline-search:focus-within,
+.orders-search:focus-within input,
+.orders-select:focus-within select,
+.form-field:focus-within input,
+.form-field:focus-within select,
+.filter-field:focus-within select,
+.settings-fields-grid label:focus-within input,
+.cart-summary-panel label:focus-within input {
+  border-color: #5b36f2;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(91, 54, 242, 0.11);
+}
+
+.topbar-search input,
+.orders-search input,
+.orders-select select,
+.products-inline-search input,
+.form-field input,
+.form-field select,
+.filter-field select,
+.settings-fields-grid input,
+.cart-summary-panel input {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.topbar-search input::placeholder,
+.orders-search input::placeholder,
+.products-inline-search input::placeholder,
+.form-field input::placeholder,
+.settings-fields-grid input::placeholder,
+.cart-summary-panel input::placeholder {
+  color: #8b93a7;
+  font-weight: 600;
+}
+
+.topbar-search-icon {
+  color: #6b7280;
+}
+
+.products-inline-search {
+  min-height: 46px;
+  border-radius: 12px;
+  padding: 0 14px;
+}
+
+.orders-search input,
+.orders-select select,
+.form-field input,
+.form-field select,
+.filter-field select {
+  min-height: 46px;
+  border-radius: 12px;
+}
+
+.filter-field span,
+.form-field span,
+.orders-select span,
+.orders-search .sr-only + input {
+  letter-spacing: 0.02em;
+}

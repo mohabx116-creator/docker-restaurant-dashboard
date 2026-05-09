@@ -164,6 +164,21 @@ const createDefaultPasswordForm = () => ({
   confirm_password: "",
 });
 
+const createQueryString = (params) => {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    const normalizedValue = String(value ?? "").trim();
+
+    if (normalizedValue && normalizedValue !== "all") {
+      searchParams.set(key, normalizedValue);
+    }
+  });
+
+  const queryString = searchParams.toString();
+  return queryString ? `?${queryString}` : "";
+};
+
 function App() {
   const toastIdRef = useRef(0);
   const [isRegister, setIsRegister] = useState(false);
@@ -410,14 +425,18 @@ function App() {
     }
   };
 
-  const fetchCart = async () => {
+  const fetchCart = async (options = {}) => {
     if (!token) return;
+
+    const search = options.search ?? cartSearchQuery;
 
     setIsCartLoading(true);
     setCartError("");
 
     try {
-      const data = await apiRequest("/cart");
+      const data = await apiRequest(
+        `/cart${createQueryString({ search })}`
+      );
       applyCartResponse(data);
     } catch (error) {
       setCartError(error instanceof Error ? error.message : "Failed to load cart");
@@ -530,14 +549,19 @@ function App() {
     }
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (options = {}) => {
     if (!token) return;
+
+    const search = options.search ?? ordersSearchQuery;
+    const status = options.status ?? statusFilter;
 
     setIsOrdersLoading(true);
     setOrdersError("");
 
     try {
-      const data = await apiRequest("/orders");
+      const data = await apiRequest(
+        `/orders${createQueryString({ search, status })}`
+      );
       setOrders(data || []);
     } catch (error) {
       const message =
@@ -548,14 +572,20 @@ function App() {
     }
   };
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (options = {}) => {
     if (!token) return;
+
+    const search = options.search ?? productSearchQuery;
+    const category = options.category ?? selectedCategory;
+    const availability = options.availability ?? selectedAvailability;
 
     setIsProductsLoading(true);
     setProductsError("");
 
     try {
-      const data = await apiRequest("/products");
+      const data = await apiRequest(
+        `/products${createQueryString({ search, category, availability })}`
+      );
       setProducts(data || []);
     } catch (error) {
       const message =
@@ -713,6 +743,46 @@ function App() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    if (!token) return undefined;
+
+    const searchTimer = window.setTimeout(() => {
+      fetchOrders({
+        search: ordersSearchQuery,
+        status: statusFilter,
+      });
+    }, 280);
+
+    return () => window.clearTimeout(searchTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordersSearchQuery, statusFilter, token]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+
+    const searchTimer = window.setTimeout(() => {
+      fetchProducts({
+        search: productSearchQuery,
+        category: selectedCategory,
+        availability: selectedAvailability,
+      });
+    }, 280);
+
+    return () => window.clearTimeout(searchTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productSearchQuery, selectedCategory, selectedAvailability, token]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+
+    const searchTimer = window.setTimeout(() => {
+      fetchCart({ search: cartSearchQuery });
+    }, 280);
+
+    return () => window.clearTimeout(searchTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartSearchQuery, token]);
 
   const handleAuth = async (event) => {
     event.preventDefault();
